@@ -51,6 +51,12 @@ Backup: the recorded video of the same run.
 - Station on another machine: start the daemon with `--station <pi-ip>:8888`. It has no authentication: anyone on that network can move the arm.
 
 ## At the table
+0. **Field-proven settings** (see `docs/RESEARCH.md`):
+   - Both arms on Station? Set `ARM_BUS=<follower serial>` (the daemon refuses to move while two buses are visible and lists the serials).
+   - Start slow: `ARM_MAX_SPEED=250` (default) and `ARM_ACCEL=10` (default); raise to about 600 / 20 only after 10 clean picks.
+   - Station must run with `--tcp`, or nothing listens on 8888. `venue/station.yaml` sets `current-threshold: 200`.
+   - Cameras: a powered USB hub or separate ports (two cameras on one controller freeze). Identify the wrist camera by the jaws in view; queue names change on replug.
+   - "stalled" or "overload" errors: the arm holds where it is. Lift less extended, tuck the elbow, then retry.
 1. **Which robot?** SO-101 has 6 motors (ids 1-6), ElRobot has 8 (ids 1-8). `venue/start.sh` warns `need ids 1-N` if the count is wrong.
 2. Hand on the arm. `arm.py relax` makes it limp (emergency stop).
 3. Start: `STATION_BIN=venue/bin/station NORMA_REPO=<checkout> venue/start.sh so101|elrobot`
@@ -68,7 +74,7 @@ Backup: the recorded video of the same run.
 9. **Live view for the judges:** `arm.py view` in another terminal, open http://127.0.0.1:8766 (ARM_PORT+1) on a big screen. It shows the latest image and every command, with the operator's `say` lines highlighted. It updates after each command finishes, not during a move.
 
 ## Fallback: taught grid (if IK or calibration is off)
-June's winner did this. It needs no kinematic model and no `calib-mark`.
+It needs no kinematic model and no `calib-mark`.
 1. Tape the ArUco sheet flat in the workspace, then park the arm out of view and run `arm.py calibrate-sheet top`. The table frame becomes the sheet: cm, origin at its top-left corner, x right, y down.
 2. `arm.py relax`. By hand, put the jaw tips at grasp height on 9 points (a 3x3 grid covering the objects and the box, coordinates in sheet cm), jaws straight. At each point, hold the arm still and run `arm.py teach X Y`. The servos keep reporting position while limp.
 3. From one taught point, lift the arm straight up about 6 cm and run `arm.py teach-lift`.

@@ -1,7 +1,7 @@
 drivers:
   st3215:
     enabled: true
-    current-threshold: 100
+    current-threshold: 200   # field practice: lower values trip the ST3215 overload fault on lifts
     deadband: 20
   vesc-trampa:
     enabled: false

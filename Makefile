@@ -1,8 +1,8 @@
 PY ?= .venv/bin/python
 
-.PHONY: check hooks compile kinematics selfcheck smoke
+.PHONY: check hooks compile kinematics selfcheck smoke station
 
-check: compile kinematics selfcheck smoke
+check: compile kinematics selfcheck smoke station
 	@echo "ALL CHECKS PASSED"
 
 hooks:
@@ -21,3 +21,6 @@ selfcheck:
 
 smoke:
 	$(PY) scripts/smoke.py
+
+station:
+	$(PY) scripts/station_logic.py

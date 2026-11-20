@@ -6,7 +6,7 @@ This file is for agents that **change this repo**. The agent that **drives the r
 HackLab Robotics x BRISA Hackathon, Berlin, 21-22 Nov 2026, NormaCore track: "Integrate the Station API into Codex or Claude so it can control the robot by looking through the cameras." The exact task is announced at the opening. Robot: most likely NormaCore's ElRobot (7+1 DoF, ST3215 servos), Station possibly on a Raspberry Pi, 2 USB cameras.
 
 ## Thesis (do not change without evidence)
-The LLM supervises: it chooses targets (numbered marks from `locate`), plans, verifies, and talks. Deterministic code does geometry, grasping and safety. Evidence is in `docs/DESIGN.md` and `docs/RESEARCH.md`: raw VLM coordinates are imprecise, and the June 2026 winner used the same split. Never make the LLM output joint angles or raw pixels.
+The LLM supervises: it chooses targets (numbered marks from `locate`), plans, verifies, and talks. Deterministic code does geometry, grasping and safety. Evidence is in `docs/DESIGN.md` and `docs/RESEARCH.md`: raw VLM coordinates are imprecise, and field reports from earlier editions of this event point the same way. Never make the LLM output joint angles or raw pixels.
 
 ## Map
 | Path | What |
