@@ -21,13 +21,14 @@ The LLM supervises: it chooses targets (numbered marks from `locate`), plans, ve
 | `docs/DESIGN.md`, `docs/RESEARCH.md` | Design decisions; what other teams and papers found |
 | `CHANGELOG.md`, `changelog.d/` | Experiment log with measured results; new entries go in `changelog.d/` |
 | `docs/archive/` | Obsolete material (the Hugging Face plan), kept for history |
+| `pyproject.toml`, `uv.lock`, `.python-version` | Dependencies and Python version (uv) |
 | `scripts/`, `Makefile`, `.githooks/`, `.github/` | Checks, hook, CI, PR template |
 
 ## Rules
 - **Safety lives in the daemon**, never in prompts: workspace clamps, z floor, speed cap, calibrated-range clamps, `relax`. A change that weakens one needs a measured reason in `CHANGELOG.md`.
 - **Station has no authentication.** Bind to 127.0.0.1 or a trusted network only; never add code that opens it wider.
 - **Measure, then claim.** Every behaviour change gets a check in sim (fixed seeds, privileged `score`) and a fragment in `changelog.d/` with the numbers (not an edit to `CHANGELOG.md`; see `changelog.d/README.md`). Write "not verified" for anything not run, and keep hardware-only facts marked as unverified until tried on the arm.
-- **Minimum code.** Stdlib and the pinned dependencies only (`requirements.txt`). A new dependency needs a security check first (maintainers, advisories, install scripts, network use) and a line in `CHANGELOG.md`.
+- **Minimum code.** Stdlib and the locked dependencies only (`pyproject.toml` + `uv.lock`; add with `uv add`, never pip). A new dependency needs a security check first (maintainers, advisories, install scripts, network use) and a line in `CHANGELOG.md`.
 - **Comments:** only for a non-obvious reason or a trap, one line. Deliberate shortcuts get a `ponytail:` comment naming the limit.
 - **Never commit** secrets, tokens, `calib.json`, `runs/`, datasets, model weights, or binaries. `.gitignore` and the pre-commit hook enforce most of this.
 - Keep `operator/AGENTS.md` and the MCP tool list in sync with any CLI command you add or change.
@@ -53,7 +54,7 @@ The LLM supervises: it chooses targets (numbered marks from `locate`), plans, ve
 
 ## Run and test
 ```
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+uv sync               # Python 3.12 + locked deps (pyproject.toml, uv.lock)
 make check            # compile, ElRobot kinematics, selfcheck, sim grasp smoke test
 .venv/bin/python arm.py serve --backend sim --seed 3      # then in another shell:
 .venv/bin/python arm.py locate ; .venv/bin/python arm.py pick red ; .venv/bin/python arm.py score

@@ -6,7 +6,7 @@ The LLM chooses and verifies; code measures and moves. A daemon (`arm.py serve`)
 
 ## Quick start (simulation, no hardware)
 ```
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+uv sync                     # installs Python 3.12 and the locked dependencies into .venv
 make hooks                                                # pre-commit checks
 make check                                                # should end with ALL CHECKS PASSED
 .venv/bin/python arm.py serve --backend sim --seed 3      # terminal 1
