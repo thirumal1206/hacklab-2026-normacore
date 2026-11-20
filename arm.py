@@ -991,8 +991,24 @@ def serve(argv):
         if spoken_for[0] == turn:
             return {"ok": True, "spoken": False, "note": "one spoken line per instruction: shown on screen only"}
         spoken_for[0] = turn
-        voice.say(text)
-        return {"ok": True, "spoken": True}
+        quip = pick_quip(text, turn)
+        line = f"{text} {quip}" if quip else text
+        voice.say(line)
+        return {"ok": True, "spoken": True, "said": line}
+
+    quips = json.loads((Path(__file__).parent / "operator" / "quips.json").read_text())
+    last_quip = [False]
+
+    def pick_quip(text, turn):
+        """Canned humour added by the robot, not the model: no tokens. Successes 1 in 4, never twice in a row; greeting once."""
+        import random
+
+        kind = "greet" if turn == "0" else "done" if text.lower().startswith("done") else None
+        if kind is None or last_quip[0] or (kind == "done" and random.random() > float(os.environ.get("ARM_QUIP_RATE", 0.25))):
+            last_quip[0] = False
+            return None
+        last_quip[0] = True
+        return random.choice(quips[kind])
 
     def barge_in():  # the robot stops talking as soon as someone presses Talk or a new line arrives
         import threading
@@ -1272,7 +1288,7 @@ else mic.onclick=()=>{
 let n=0;const log=document.getElementById('log'),box=document.getElementById('img');
 async function tick(){try{const ev=await (await fetch('events?since='+n)).json();
 for(const e of ev){n++;const d=document.createElement('div');const r=e.out||{};
-if(e.cmd==='say'){d.className='e say';d.textContent=e.args.join(' ')}
+if(e.cmd==='say'){d.className='e say';d.textContent=r.said||e.args.join(' ')}
 else if(e.cmd==='heard'){d.className='e heard';d.textContent='You: '+e.args.join(' ')}
 else{d.className='e';const t=new Date(e.t*1000).toLocaleTimeString();
 let s=r.error?`<span class=err>${r.error}</span>`:'holding' in r?`<span class=${r.holding?'ok':'err'}>holding: ${r.holding}</span>`:
