@@ -2,8 +2,45 @@
 
 Everything below is untested on real hardware. Record what you see in `CHANGELOG.md`.
 
+## Schedule (Sat 21 - Sun 22 Nov, CIC Berlin)
+| When | Goal | Done when |
+|---|---|---|
+| Sat 11:00 opening | Learn the task, judging, hardware, Station version and address | Answers to "At the opening" below written in CHANGELOG |
+| Sat until ~14:00 | Bring-up on the real arm: `bringup`, joint directions, gripper, calibration | Reprojection error < 5 px; one pick by hand command works |
+| Sat afternoon | Smoke test then 10 timed trials; fix what breaks; taught-grid fallback if IK is off | Success rate written in a `changelog.d/` fragment |
+| Sat evening | Friday end to end on the real arm, the task they announced | One full run without touching the keyboard |
+| Sun morning | Harden: lighting, crowding, recovery; record the backup video | Backup video saved; demo script rehearsed twice |
+| Sun 17:45 | Submission (repo public if they require it) | Submitted |
+| Sun 18:00 / 19:00 | Judging / pitches | |
+
+Roles: one person on the arm and bring-up (hand near the arm, owns `relax`), one on Friday, the live view and the pitch. Swap only at a checkpoint.
+
+## Pack list
+- Both laptops charged, chargers, a **multi-socket strip**. A USB hub (USB-A/C adapters) and a spare USB-C cable.
+- **Printed ArUco sheet** (`venue/aruco_markers_A4.png`, 100%, a marker measures 50 mm) plus a spare, and tape.
+- **Headphones** for the Friday laptop: the speaker echo otherwise reaches the mic (the echo filter is a backstop, not a guarantee).
+- A phone hotspot (see "What needs internet").
+- A few test objects of our own: cubes, a cup, a pen, an eraser (known to work in sim).
+
+## What needs internet
+| Needs internet | Works offline |
+|---|---|
+| Claude Code / Codex (the model) | Station, `arm.py` daemon, the simulator |
+| Hands-free speech recognition in Chrome (Google) | VoiceStudio voice: start it with `HF_HUB_OFFLINE=1` (verified: speech generated with Hugging Face offline) |
+| `git push`, `uv sync` on a fresh laptop | Live view, typing commands into it |
+If the venue Wi-Fi is slow: switch the Friday laptop to the phone hotspot, and type into the live view instead of talking.
+
+## Demo script (under 1 minute, rehearse it)
+1. (Live view on the big screen, objects on the table.) "Friday, hello." She waves and greets.
+2. "Friday, tidy the table." She reports one line per object; the marks image updates.
+3. Mid-task, one of us moves an object back out. She notices on her next look and fixes it: **this is the moment to point at.**
+4. "Friday, stop." The arm freezes; she confirms in one line.
+5. Close: "The model only chooses and checks; code measures and moves, and every safety limit lives in the robot daemon."
+Backup: the recorded video of the same run.
+
 ## Before leaving (each laptop)
-1. `.venv/bin/python arm.py selfcheck --repo <norma-core checkout>` must print `ALL OK`.
+0. `uv sync && make hooks && make check` must end with `ALL CHECKS PASSED`.
+1. `.venv/bin/python arm.py selfcheck --repo <norma-core checkout>` must print `ALL OK`. Keep **both** checkouts: `norma-core` (main, 6b494f7) and `norma-core-dev` (dev, 65f9ab9, reads VP8 camera frames); use the one matching the venue's Station.
 2. Print `venue/aruco_markers_A4.png` at 100%, no scaling. Measure a marker: 50 mm.
 3. Station binary: `venue/bin/station` (arm64 macOS, built from norma-core 6b494f7, plus one local patch so the built-in camera is listed; sha256 in CHANGELOG). On Linux, build from source instead.
 4. Allow camera access for the terminal app you start it from (macOS asks once).
