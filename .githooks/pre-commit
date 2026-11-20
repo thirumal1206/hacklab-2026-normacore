@@ -1,0 +1,40 @@
+#!/bin/sh
+# Fast checks on staged files. Full suite: make check.
+set -e
+PY=.venv/bin/python
+[ -x "$PY" ] || PY=python3
+files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$files" ] && exit 0
+fail=0
+
+# no big files (limit 5 MB)
+for f in $files; do
+  [ -f "$f" ] || continue
+  size=$(wc -c < "$f")
+  if [ "$size" -gt 5242880 ]; then echo "pre-commit: $f is $((size / 1048576)) MB (limit 5 MB)"; fail=1; fi
+done
+
+# no secrets: private keys, common token formats, credential assignments
+if git diff --cached -U0 -- $files | grep '^+' | grep -E -i -q -e \
+  '-----BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|(api[_-]?key|secret|password|token)[[:space:]]*[:=][[:space:]]*["'\''][^"'\'' ]{12,}'; then
+  echo "pre-commit: possible secret in staged changes:"
+  git diff --cached -U0 -- $files | grep '^+' | grep -E -i -n -e \
+    '-----BEGIN [A-Z ]*PRIVATE KEY|ghp_|github_pat_|sk-|hf_[A-Za-z0-9]{30,}|AKIA|(api[_-]?key|secret|password|token)[[:space:]]*[:=]' | head -5
+  fail=1
+fi
+
+# files that must never be committed
+for f in $files; do
+  case "$f" in
+    calib.json|runs/*|*.env|.env*|*.pem|*.key|*.safetensors|*.ckpt|*.pt|*.parquet) echo "pre-commit: $f must not be committed"; fail=1 ;;
+  esac
+done
+
+# python compiles
+py=$(echo "$files" | grep '\.py$' || true)
+[ -n "$py" ] && { $PY -m py_compile $py || fail=1; }
+
+# trailing whitespace and merge markers in text files
+if git diff --cached --check -- $files >/dev/null 2>&1; then :; else git diff --cached --check -- $files | head -5; fail=1; fi
+
+[ "$fail" -eq 0 ] || { echo "pre-commit: fix the above (never use --no-verify)"; exit 1; }
