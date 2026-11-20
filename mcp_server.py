@@ -33,7 +33,7 @@ TOOLS = {  # name: (description, {param: schema}, required)
     "listen": ("Wait for the next spoken or typed instruction from the audience (live view). Returns instruction or null.",
                {"wait_s": NUM}, []),
     "gesture": ("Expressive move: wave, nod, yes or no.", {"name": {"type": "string", "enum": ["wave", "nod", "yes", "no"]}}, ["name"]),
-    "say": ("One short line shown to the audience in the live view.", {"text": {"type": "string"}}, ["text"]),
+    "say": ("Speak one short line aloud (also shown in the live view). Only one is spoken per instruction.", {"text": {"type": "string"}}, ["text"]),
 }
 
 
@@ -59,8 +59,6 @@ SLIM = ("id", "x", "y", "shape", "kind", "inside", "yaw_deg")
 
 
 def run_tool(name, a):
-    if a.get("say") and name != "say":  # speak and act in one tool call: one model turn instead of two
-        arm.call("say", [a["say"]])
     if name == "listen":  # local inbox, not the daemon
         out = arm.listen(["--wait", str(a.get("wait_s", 300))])
         return {"content": [{"type": "text", "text": json.dumps(out)}], "isError": False}
@@ -89,9 +87,8 @@ def handle(msg):
                 "instructions": "Robot arm seen through cameras. Units: cm, robot base frame (x forward, y left, z up). "
                                 "One physical tool call at a time; park before locate; confirm results with locate or look."}
     if m == "tools/list":
-        say = {"say": {"type": "string", "description": "Optional line to speak as this starts (saves a separate say call)."}}
         return {"tools": [{"name": n, "description": d,
-                           "inputSchema": {"type": "object", "properties": props if n in ("say", "listen") else {**props, **say}, "required": req}}
+                           "inputSchema": {"type": "object", "properties": props, "required": req}}
                           for n, (d, props, req) in TOOLS.items()]}
     if m == "tools/call":
         if p["name"] not in TOOLS:

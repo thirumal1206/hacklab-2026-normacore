@@ -982,6 +982,18 @@ def serve(argv):
     events.write_text("")
     voice = Voice()
 
+    spoken_for = [None]
+
+    def speak_once(text):
+        """At most one spoken line per instruction; more still shows in the live view, silently."""
+        pos = OUT / "inbox.pos"
+        turn = pos.read_text() if pos.exists() else "0"
+        if spoken_for[0] == turn:
+            return {"ok": True, "spoken": False, "note": "one spoken line per instruction: shown on screen only"}
+        spoken_for[0] = turn
+        voice.say(text)
+        return {"ok": True, "spoken": True}
+
     def barge_in():  # the robot stops talking as soon as someone presses Talk or a new line arrives
         import threading
 
@@ -1029,7 +1041,7 @@ def serve(argv):
                     "gpick": lambda: arm.gpick(*arm.target(a)),
                     "gplace": lambda: arm.gplace(*arm.target(a)[:2]),
                     "calibrate-sheet": lambda: arm.calibrate_sheet(a[0] if a else "top"),
-                    "say": lambda: (voice.say(" ".join(a)), {"ok": True})[1],  # narration: live view + voice
+                    "say": lambda: speak_once(" ".join(a)),
                     "gesture": lambda: arm.gesture(a[0]),
                     "nudge": lambda: backend.nudge(a[0], f(1), f(2)),
                 }[cmd]()
