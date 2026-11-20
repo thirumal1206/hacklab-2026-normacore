@@ -167,7 +167,8 @@ class StationBackend(SimBackend):
 
     TICKS_PER_DEG = 4096 / 360
     SIGN = (1, 1, 1, 1, 1, 1)  # per joint; flip after the venue check "joints 0 0 0 0 0 30" vs the sim pose
-    MAX_SPEED = 600  # ticks/s (~53 deg/s); goal speed register
+    MAX_SPEED = int(os.environ.get("ARM_MAX_SPEED", 250))  # ticks/s goal-speed cap; field practice: start ~250, raise to ~600 once trusted
+    ACCEL = int(os.environ.get("ARM_ACCEL", 10))  # acceleration register; servos come out of calibration at 0 = maximum
     CALIB = Path(__file__).parent / "calib.json"
 
     def __init__(self, addr, repo, cams, robot="so101"):
@@ -193,6 +194,8 @@ class StationBackend(SimBackend):
         self.pb = dict(st3215=st3215, usbvideo=usbvideo, commands=commands, drivers=drivers, send=send_commands)
         self.cams = cams  # {"top": "usbvideo/<md5>", ...}
         self.motors, self.frames, self.vp8 = {}, {}, {}  # motor id -> (pos, min, max); cam -> latest pack; cam -> VP8 chain
+        self.buses, self.status, self.seen = {}, {}, {}  # serial -> {id: (pos, min, max)}; id -> status byte; cam -> last frame time
+        self.bus = os.environ.get("ARM_BUS")  # follower serial; required when the leader arm is on Station too
         self.loop = asyncio.new_event_loop()
         threading.Thread(target=self.loop.run_forever, daemon=True).start()
         self.run = lambda coro, t=15: asyncio.run_coroutine_threadsafe(coro, self.loop).result(t)
@@ -201,14 +204,16 @@ class StationBackend(SimBackend):
         deadline = time.time() + 5
         while len(self.motors) < self.nm and time.time() < deadline:
             time.sleep(0.1)
-        self.arm_ok = len(self.motors) == self.nm
+        self.not_ok = self.motion_check()
+        self.arm_ok = self.not_ok is None
         if not self.arm_ok:
-            print(f"WARNING: motors {sorted(self.motors)} on st3215/inference, need ids 1-{self.nm}: camera-only, motion disabled", file=sys.stderr)
+            print(f"WARNING: {self.not_ok}: camera-only, motion disabled", file=sys.stderr)
             import numpy as np
 
             self.q = np.zeros(self.nm)
         else:
             self.q = self.joints()
+            self._write(0x29, {j: self.ACCEL.to_bytes(1, "little") for j in range(1, self.nm + 1)})
         self.H = {k: __import__("numpy").array(v) for k, v in json.loads(self.CALIB.read_text()).items()} if self.CALIB.exists() else {}
 
     async def _start_follows(self):
@@ -227,18 +232,24 @@ class StationBackend(SimBackend):
         def on_motors(data):
             st = self.pb["st3215"].InferenceStateReader(memoryview(data))
             for bus in st.get_buses() or []:
-                self.bus = bus.get_bus().get_serial_number()  # ponytail: assumes one bus (the follower arm)
+                serial = bus.get_bus().get_serial_number()
+                motors = self.buses.setdefault(serial, {})
                 for m in bus.get_motors() or []:
                     s = bytes(m.get_state())
                     if len(s) >= 0x3A:
                         raw = int.from_bytes(s[0x38:0x3A], "little")
                         pos = (4096 - (raw & 4095)) & 4095 if raw & 0x8000 else raw & 4095  # sign-magnitude
-                        self.motors[m.get_id()] = (pos, m.get_range_min(), m.get_range_max())
+                        motors[m.get_id()] = (pos, m.get_range_min(), m.get_range_max())
+                        if serial == self.follower() and len(s) > 0x41:
+                            self.status[m.get_id()] = s[0x41]  # bit 0x20 = overload fault
+                if serial == self.follower():
+                    self.motors = motors
 
         def on_frame(cam):
             def h(data):
                 env = self.pb["usbvideo"].RxEnvelopeReader(memoryview(data))
                 if env.get_type() == 0:  # ET_FRAMES
+                    self.seen[cam] = time.time()
                     fp = self.frames[cam] = env.get_frames()
                     if fp.get_format().get_kind() == 2:  # FF_VP8: keep the chain since the last keyframe
                         chain = self.vp8.setdefault(cam, [])
@@ -265,10 +276,10 @@ class StationBackend(SimBackend):
             frac = (pos - lo) / max(1, hi - lo)
             if j == self.nm:
                 out.append((1 - frac if self.grip_flip else frac) * 100)
-            elif self.robot == "elrobot":  # NormaCore viewer: calibrated range maps linearly onto the URDF limits
+            elif self.robot == "elrobot" and os.environ.get("ARM_ELROBOT_MAP") == "linear":  # old guess: range -> URDF limits linearly
                 a, b = self.solver().lo[j - 1], self.solver().hi[j - 1]
                 out.append(a + (frac if self.SIGN[j - 1] > 0 else 1 - frac) * (b - a))
-            else:
+            else:  # ticks are absolute angles: degrees around the range centre (ElRobot ranges are centred on tick 2048)
                 out.append(self.SIGN[j - 1] * (pos - (lo + hi) / 2) / self.TICKS_PER_DEG)
         return np.array(out)
 
@@ -276,7 +287,7 @@ class StationBackend(SimBackend):
         pos, lo, hi = self.motors[j]
         if j == self.nm:
             r = lo + (1 - v / 100 if self.grip_flip else v / 100) * (hi - lo)
-        elif self.robot == "elrobot":
+        elif self.robot == "elrobot" and os.environ.get("ARM_ELROBOT_MAP") == "linear":
             a, b = self.solver().lo[j - 1], self.solver().hi[j - 1]
             frac = (v - a) / (b - a)
             r = lo + (frac if self.SIGN[j - 1] > 0 else 1 - frac) * (hi - lo)
@@ -288,26 +299,62 @@ class StationBackend(SimBackend):
         import numpy as np
 
         if not self.arm_ok:
-            raise RuntimeError("no arm on st3215/inference: camera-only mode, cannot move")
-        pb = self.pb
+            raise RuntimeError(f"motion disabled: {self.not_ok}")
         goals = {j: self._raw(j, target[j - 1]) for j in range(1, self.nm + 1)}
         dist = {j: abs(goals[j] - self.motors[j][0]) for j in goals}
         T = max(steps / 30, max(dist.values()) / self.MAX_SPEED)
-        sync = lambda addr, vals: pb["commands"].DriverCommand(
-            type=pb["drivers"].StationCommandType.STC_ST3215_COMMAND,
-            body=pb["st3215"].Command(target_bus_serial=self.bus, sync_write=pb["st3215"].ST3215SyncWriteCommand(
-                address=addr, motors=[pb["st3215"].ST3215SyncWriteCommand_MotorWrite(motor_id=j, value=v) for j, v in vals.items()])).encode())
         speed = {j: max(20, min(self.MAX_SPEED, int(d / T))).to_bytes(2, "little") for j, d in dist.items()}  # all joints arrive together
-        self.run(pb["send"](self.client, [sync(0x2E, speed), sync(0x2A, {j: g.to_bytes(2, "little") for j, g in goals.items()})]))
-        deadline = time.time() + T + 2
+        self._write(0x2E, speed)
+        self._write(0x2A, {j: g.to_bytes(2, "little") for j, g in goals.items()})
+        deadline, best, flat, tick = time.time() + T + 2, None, 0, time.time()
         while time.time() < deadline and any(abs(self.motors[j][0] - goals[j]) > 25 for j in range(1, self.nm)):
-            if stop_heard():  # freeze where we are: goal = present position
-                here = {j: self.motors[j][0].to_bytes(2, "little") for j in goals}
-                self.run(pb["send"](self.client, [sync(0x2A, here)]))
-                self.q = self.joints()
-                raise RuntimeError("stopped: a stop was said; call listen")
+            why = "stopped: a stop was said; call listen" if stop_heard() else self.fault()
+            if why is None and time.time() - tick >= 0.5:  # stall: < 8 ticks of progress in 4 checks 0.5 s apart
+                tick, left = time.time(), sum(abs(self.motors[j][0] - goals[j]) for j in range(1, self.nm))
+                flat = flat + 1 if best is not None and best - left < 8 else 0
+                best = left if best is None else min(best, left)
+                if flat >= 4:
+                    why = "stalled before the target (blocked, or overloaded: lift less extended, or tuck the elbow first)"
+            if why:
+                self.hold()
+                raise RuntimeError(why)
             time.sleep(0.05)
         self.q = np.asarray(target, float)
+
+    def follower(self):
+        """Serial of the bus to drive: ARM_BUS, else the only bus seen; None while ambiguous."""
+        return self.bus or (next(iter(self.buses)) if len(self.buses) == 1 else None)
+
+    def motion_check(self):
+        """Why the arm must not move, or None. Field lesson: never drive the leader bus or an uncalibrated joint."""
+        if len(self.buses) > 1 and not self.bus:
+            return f"two motor buses {sorted(self.buses)} (leader and follower): set ARM_BUS=<follower serial>"
+        if self.bus and self.bus not in self.buses:
+            return f"ARM_BUS={self.bus} not on Station (seen: {sorted(self.buses)})"
+        missing = [j for j in range(1, self.nm + 1) if j not in self.motors]
+        if missing:
+            return f"motors {missing} missing on st3215/inference (need ids 1-{self.nm})"
+        flat = [j for j in range(1, self.nm + 1) if self.motors[j][2] - self.motors[j][1] < 50]
+        if flat:
+            return f"motors {flat} are not calibrated (empty range): calibrate in the Station web UI first"
+        return None
+
+    def fault(self):
+        bad = [j for j, s in self.status.items() if s & 0x20]
+        return f"overload fault on motors {bad}: holding; let it unload, then lift less extended" if bad else None
+
+    def hold(self):
+        """Freeze where the arm is: goal = present position."""
+        self._write(0x2A, {j: self.motors[j][0].to_bytes(2, "little") for j in range(1, self.nm + 1)})
+        self.q = self.joints()
+
+    def _write(self, addr, vals):
+        pb = self.pb
+        cmd = pb["commands"].DriverCommand(
+            type=pb["drivers"].StationCommandType.STC_ST3215_COMMAND,
+            body=pb["st3215"].Command(target_bus_serial=self.follower(), sync_write=pb["st3215"].ST3215SyncWriteCommand(
+                address=addr, motors=[pb["st3215"].ST3215SyncWriteCommand_MotorWrite(motor_id=j, value=v) for j, v in vals.items()])).encode())
+        self.run(pb["send"](self.client, [cmd]))
 
     def solver(self):
         if self.robot != "elrobot":
@@ -333,6 +380,9 @@ class StationBackend(SimBackend):
     def image(self, cam):
         deadline = time.time() + 6  # first ~2 s after camera start are dark (auto-exposure)
         while True:
+            if cam in self.seen and time.time() - self.seen[cam] > 3:  # a frozen feed must not pass as the current scene
+                raise RuntimeError(f"camera {cam}: no new frame for {time.time() - self.seen[cam]:.0f} s (USB bandwidth? use a powered hub "
+                                   "or separate USB ports, then restart Station; queue names change on replug)")
             if cam in self.frames and (self.frames[cam].get_format().get_kind() != 2 or self.vp8.get(cam)):
                 im = vp8_last(list(self.vp8[cam])) if cam in self.vp8 else self._decode(self.frames[cam])
                 if im.mean() > 40 or time.time() > deadline:
@@ -489,7 +539,7 @@ class Arm:
         self.b, self.marks = backend, {}
         self.grid = json.loads(self.GRID.read_text()) if self.GRID.exists() else {"pts": [], "lift": None}
 
-    # Taught-grid fallback (June winner's approach): no kinematic model. Grasp poses taught by hand at table points,
+    # Taught-grid fallback: no kinematic model. Grasp poses taught by hand at table points,
     # joints fitted per joint as a quadratic in (x, y); a lift offset taught once.
     def teach(self, x, y):
         import numpy as np
@@ -622,7 +672,18 @@ class Arm:
     def grip(self, state):
         g = {"open": 100.0, "close": 0.0}[state]
         target = self.b.q.copy()
-        target[self.b.prof["n"]] = g
+        n = self.b.prof["n"]
+        if state == "close" and isinstance(self.b, StationBackend):
+            # Field lesson: close in small steps and stop when the jaws stop moving (= gripped); squeezing on stalls the servo.
+            last, still = self.b.joints()[n], 0
+            while target[n] > 0 and still < 2:
+                target[n] = max(0.0, target[n] - 8.0)
+                self.b.drive(target, 10)
+                now = self.b.joints()[n]
+                still, last = (still + 1 if last - now < 1.0 else 0), now
+            target[n] = self.b.joints()[n]  # hold where the jaws stopped
+        else:
+            target[n] = g
         self.b.drive(target, 20)
         return self.status()
 
@@ -676,12 +737,16 @@ class Arm:
         return out
 
     def _pick(self, x, y, yaw=None, roll_offset=0.0):
+        import numpy as np
+
         self.grip("open")
         self._arrive(x, y, yaw, roll_offset)
         self.move(x, y, self.b.prof["hover"] * 100, yaw, roll_offset=roll_offset)
         self.move(x, y, self.b.prof["grasp"] * 100, yaw, roll_offset=roll_offset)
         self.grip("close")
-        self.move(x, y, self.b.prof["hover"] * 100)
+        P = self.b.prof
+        for z in np.linspace(P["grasp"], P["hover"], 4)[1:]:  # lift in short steps: a loaded arm overloads on one long lift
+            self.move(x, y, z * 100)
         s = self.status()
         s["holding"] = s["gripper"] > 5  # closed on something, not on air
         return s
