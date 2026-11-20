@@ -419,8 +419,11 @@ class Voice:
                     continue
                 if gen != self.gen:  # interrupted while synthesising
                     continue
+                (OUT / "said.txt").write_text(text)  # the live view drops mic transcripts that echo this
+                (OUT / "speaking").touch()
                 self.proc = subprocess.Popen(cmd)
                 self.proc.wait()
+                (OUT / "speaking").unlink(missing_ok=True)
             except Exception as e:  # a voice failure must never stop the robot
                 print(f"voice: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
             finally:
@@ -1217,15 +1220,27 @@ VIEW_HTML = """<!doctype html><meta charset=utf-8><title>Arm live view</title>
 #img{flex:3;display:flex;align-items:center;justify-content:center;background:#000}#img img{max-width:100%;max-height:100%}
 #side{flex:2;display:flex;flex-direction:column;min-width:0}#log{flex:1;overflow:auto;padding:12px}#f{display:flex;gap:8px;padding:12px;border-bottom:1px solid #333}#f input{flex:1;font:16px system-ui;padding:8px;background:#222;color:#fff;border:1px solid #444;border-radius:6px}#f button{font:16px system-ui;padding:8px 12px;border-radius:6px;border:0;background:#2a5;color:#fff;cursor:pointer}#f button.on{background:#c33}.heard{color:#fc6;font-size:16px}.e{padding:6px 8px;border-bottom:1px solid #222}.say{color:#fff;font-size:17px;background:#234}
 .err{color:#f88}.ok{color:#8f8}code{color:#9cf}@media(max-width:700px){body{flex-direction:column}}</style>
-<div id=img><span>waiting for an image</span></div><div id=side><form id=f><button type=button id=mic>Talk</button><input id=t placeholder="Say or type a command, Enter to send" autocomplete=off></form><div id=log></div></div>
+<div id=img><span>waiting for an image</span></div><div id=side><form id=f><button type=button id=mic>Hands-free</button><input id=t placeholder="Say or type a command, Enter to send" autocomplete=off></form><div id=log></div></div>
 <script>
 const send=t=>t&&fetch('command',{method:'POST',body:JSON.stringify({text:t})});
 const f=document.getElementById('f'),t=document.getElementById('t'),mic=document.getElementById('mic');
 f.onsubmit=e=>{e.preventDefault();send(t.value.trim());t.value=''};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\\bfriday\\b[\\s,.!?]*/i;
+const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,'').trim();
+let said='',hands=null;
+setInterval(async()=>{try{said=norm((await (await fetch('state')).json()).said)}catch(_){}},500);
+const echo=t=>{const w=norm(t);return w.length>3&&said.includes(w)};
 if(!SR)mic.disabled=true,mic.title='no speech recognition in this browser: type instead';
-else mic.onclick=()=>{fetch('hush',{method:'POST'});const r=new SR();r.lang='en-US';mic.classList.add('on');
-r.onresult=e=>send(e.results[0][0].transcript);r.onend=()=>mic.classList.remove('on');r.start()};
+else mic.onclick=()=>{
+  if(hands){const h=hands;hands=null;h.stop();mic.classList.remove('on');mic.textContent='Hands-free';return}
+  const r=new SR();r.lang='en-US';r.continuous=true;r.interimResults=true;hands=r;
+  mic.classList.add('on');mic.textContent='Listening: say "Friday, ..."';
+  r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
+    if(!WAKE.test(t)||echo(t))continue;
+    if(!e.results[i].isFinal){fetch('hush',{method:'POST'});continue}  // barge-in on the wake word
+    const cmd=t.slice(t.search(WAKE)).replace(WAKE,'').trim();send(cmd||'yes?')}};
+  r.onend=()=>{if(hands===r)r.start()};  // Chrome ends sessions after silence: keep listening
+  r.start()};
 let n=0;const log=document.getElementById('log'),box=document.getElementById('img');
 async function tick(){try{const ev=await (await fetch('events?since='+n)).json();
 for(const e of ev){n++;const d=document.createElement('div');const r=e.out||{};
@@ -1268,7 +1283,11 @@ def view(argv):
     class V(BaseHTTPRequestHandler):
         def do_GET(self):
             u = urlparse(self.path)
-            if u.path == "/events":
+            if u.path == "/state":
+                said = OUT / "said.txt"
+                body, ctype = json.dumps({"speaking": (OUT / "speaking").exists(),
+                                          "said": said.read_text() if (OUT / "speaking").exists() and said.exists() else ""}).encode(), "application/json"
+            elif u.path == "/events":
                 since = int(parse_qs(u.query).get("since", ["0"])[0])
                 lines = log.read_text().splitlines() if log.exists() else []
                 body, ctype = ("[" + ",".join(lines[since:]) + "]").encode(), "application/json"
