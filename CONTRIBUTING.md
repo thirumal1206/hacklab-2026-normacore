@@ -4,7 +4,7 @@ Two people, one robot, 48 hours. These rules keep `main` always demo-ready.
 
 ## Setup (once per laptop)
 ```
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+uv sync         # Python 3.12 + locked dependencies in .venv (install uv: brew install uv)
 make hooks      # installs the pre-commit hook (.githooks/pre-commit)
 make check
 ```
@@ -28,7 +28,7 @@ make check
 - Safety limits (workspace, z floor, speed, calibrated ranges) are never loosened without a measured reason.
 
 ## Code style
-- Python 3.11+, stdlib plus `requirements.txt`. New dependencies need a security check (maintainers, advisories, install scripts, network use) noted in the PR.
+- Python 3.12 (`.python-version`), stdlib plus the locked dependencies (`pyproject.toml`, `uv.lock`). Add one with `uv add`; never `pip install` into the project. New dependencies need a security check (maintainers, advisories, install scripts, network use) noted in the PR.
 - Minimum code, no speculative abstractions. Comments only for a non-obvious reason or a trap.
 - Match the existing style; `python -m py_compile` must pass.
 
