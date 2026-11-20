@@ -140,7 +140,7 @@ class _World:
         self.substeps = max(1, round(1 / (fps * self.model.opt.timestep)))
         self.model.opt.timestep = 1 / (fps * self.substeps)
         self.data = mujoco.MjData(self.model)
-        self.renderer = mujoco.Renderer(self.model, height, width)
+        self.renderer, self._size = None, (height, width)  # created on first render: the real-arm path never renders
         self.qadr = np.array([self.model.joint(name).qposadr[0] for name in JOINTS])
         self.cube_bodies = [self._id(mujoco.mjtObj.mjOBJ_BODY, name, "the task") for name in CUBE_BODIES]
         self.box_body = self._id(mujoco.mjtObj.mjOBJ_BODY, BOX_BODY, "the task")
@@ -274,6 +274,8 @@ class _World:
         return int(inside.sum())
 
     def render(self, camera: str) -> np.ndarray:
+        if self.renderer is None:
+            self.renderer = mujoco.Renderer(self.model, *self._size)
         self.renderer.update_scene(self.data, camera=camera)
         return self.renderer.render().copy()
 
@@ -306,7 +308,7 @@ class SO101Env(gym.Env):
         self.height = observation_height
         self.width = observation_width
         # Observation key -> MJCF camera name.
-        self.cameras = dict(cameras or {"front": "front", "wrist": "wrist_cam"})
+        self.cameras = dict({"front": "front", "wrist": "wrist_cam"} if cameras is None else cameras)
         self.instruction = instruction
         self.initial_joints = np.asarray(initial_joints, dtype=np.float32)
         if self.initial_joints.shape != (len(JOINTS),):

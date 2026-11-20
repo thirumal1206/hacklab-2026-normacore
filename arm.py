@@ -21,7 +21,7 @@ import os
 import sys
 import time
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 
 PORT = int(os.environ.get("ARM_PORT", 8765))
@@ -64,7 +64,7 @@ COLORS = {  # HSV ranges (OpenCV: H 0-179)
 class SimBackend:
     """MuJoCo SO-101 tabletop. Joints in degrees, gripper 0 (closed) - 100 (open)."""
 
-    def __init__(self, seed=0, scene=None):
+    def __init__(self, seed=0, scene=None, cameras=None):
         sys.path.insert(0, str(Path(__file__).parent / "so101-sim"))
         sys.path.insert(0, str(Path(__file__).parent))
         import env
@@ -74,7 +74,8 @@ class SimBackend:
         self.prof = SO101
         self.env_mod, self.mj, self.in_box = env, mujoco, in_box
         extra = {"scene": Path(__file__).parent / "so101-sim" / f"so101_tabletop_{scene}.xml"} if scene else {}
-        self.e = env.SO101Env(**{**env.DEFAULTS, "cameras": {"front": "front", "top": "top", "wrist": "wrist_cam"}, **extra},
+        cams = {"front": "front", "top": "top", "wrist": "wrist_cam"} if cameras is None else cameras
+        self.e = env.SO101Env(**{**env.DEFAULTS, "cameras": cams, **extra},
                               observation_height=480, observation_width=640)
         self.reset(seed)
         self.Expert = Expert
@@ -174,7 +175,7 @@ class StationBackend(SimBackend):
         import logging
         import threading
 
-        super().__init__(seed=0)
+        super().__init__(seed=0, cameras={})  # kinematic model only: no sim cameras, no renderer, no GL needed
         self.robot = robot
         self.prof = ELROBOT if robot == "elrobot" else SO101
         self.nm = self.prof["n"] + 1  # motor ids 1..nm, the last one is the gripper
@@ -473,6 +474,10 @@ def vp8_last(chain):
     if last is None:
         raise RuntimeError("VP8 decode failed")
     return cv2.cvtColor(last, cv2.COLOR_BGR2RGB)
+
+
+class _Done(Exception):
+    pass
 
 
 class Arm:
@@ -982,6 +987,38 @@ def serve(argv):
     events.write_text("")
     voice = Voice()
 
+    import threading
+
+    import queue
+
+    ThreadingHTTPServer.request_queue_size = 64  # default 5 resets bursts of parallel clients
+    jobs = queue.Queue()  # robot commands run one at a time on the main thread (GL contexts are bound to it on macOS)
+
+    def on_robot_thread(fn):
+        done, box = threading.Event(), {}
+
+        def job():
+            try:
+                box["out"] = fn()
+            except BaseException as e:
+                box["err"] = e
+            done.set()
+        jobs.put(job)
+        done.wait()
+        if "err" in box:
+            raise box["err"]
+        return box["out"]
+
+    def take_inbox():
+        """Next instruction from the live view (the inbox lives next to the daemon), or None."""
+        lines = INBOX.read_text().splitlines() if INBOX.exists() else []
+        pos = OUT / "inbox.pos"
+        seen = int(pos.read_text()) if pos.exists() else 0
+        if len(lines) <= seen:
+            return {"instruction": None}
+        pos.write_text(str(seen + 1))
+        return {"instruction": json.loads(lines[seen])["text"], "pending": len(lines) - seen - 1}
+
     spoken_for = [None]
 
     def speak_once(text):
@@ -1034,7 +1071,11 @@ def serve(argv):
                     raise RuntimeError(f"interrupted: {unread()}; call listen before moving")
                 f = lambda i: float(a[i])
                 yaw = float(a[a.index("--yaw") + 1]) if "--yaw" in a else None
-                out = {
+                quick = {"inbox": lambda: take_inbox(), "hush": lambda: (voice.hush(), {"ok": True})[1]}
+                if cmd in quick:  # answered while the arm moves: listen and barge-in work from another machine
+                    out = quick[cmd]()
+                    raise _Done
+                out = on_robot_thread(lambda: {
                     "look": lambda: arm.look(["top", "front", "wrist"] if not a or a[0] == "all" else a),
                     "locate": lambda: arm.locate(),
                     "snapshot": lambda: arm.snapshot(a or ["top"]),
@@ -1060,7 +1101,9 @@ def serve(argv):
                     "say": lambda: speak_once(" ".join(a)),
                     "gesture": lambda: arm.gesture(a[0]),
                     "nudge": lambda: backend.nudge(a[0], f(1), f(2)),
-                }[cmd]()
+                    }[cmd]())
+                code = 200
+            except _Done:
                 code = 200
             except Exception as e:  # report to the agent instead of crashing the daemon
                 out, code = {"error": f"{type(e).__name__}: {e}"}, 400
@@ -1081,7 +1124,7 @@ def serve(argv):
     if SOCK:
         import socket
 
-        class UnixServer(HTTPServer):
+        class UnixServer(ThreadingHTTPServer):
             address_family = socket.AF_UNIX
 
             def server_bind(self):
@@ -1094,9 +1137,11 @@ def serve(argv):
         os.chmod(SOCK, 0o600)  # only the owner can send commands to the arm
         print(f"arm daemon on unix:{SOCK}", flush=True)
     else:
-        srv = HTTPServer(("127.0.0.1", PORT), H)
+        srv = ThreadingHTTPServer(("127.0.0.1", PORT), H)
         print(f"arm daemon on 127.0.0.1:{PORT}", flush=True)
-    srv.serve_forever()  # ponytail: single-threaded = commands never overlap
+    threading.Thread(target=srv.serve_forever, daemon=True).start()  # requests on threads; inbox/hush answer at once
+    while True:  # ponytail: the main thread is the robot thread, so arm commands never overlap
+        jobs.get()()
 
 
 def selfcheck(argv):
@@ -1300,19 +1345,13 @@ if(im)box.innerHTML='<img src="img/'+im.split('/').pop()+'">'}}catch(_){}setTime
 
 
 def listen(argv):
-    """Next spoken/typed instruction from the live view; waits up to --wait S (default 60). Runs locally, not in the daemon."""
+    """Next spoken/typed instruction, asked from the daemon (works when the daemon runs on another machine); waits up to --wait S."""
     wait = float(argv[argv.index("--wait") + 1]) if "--wait" in argv else 60
-    pos = OUT / "inbox.pos"
     deadline = time.time() + wait
     while True:
-        lines = INBOX.read_text().splitlines() if INBOX.exists() else []
-        seen = int(pos.read_text()) if pos.exists() else 0
-        if len(lines) > seen:
-            pos.write_text(str(seen + 1))
-            out = json.loads(lines[seen])
-            return {"instruction": out["text"], "pending": len(lines) - seen - 1}
-        if time.time() > deadline:
-            return {"instruction": None, "note": f"nothing said in {wait:.0f} s"}
+        out = json.loads(call("inbox")[1])
+        if out.get("instruction") or time.time() > deadline:
+            return out if out.get("instruction") else {"instruction": None, "note": f"nothing said in {wait:.0f} s"}
         time.sleep(0.3)
 
 

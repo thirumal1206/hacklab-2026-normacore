@@ -58,6 +58,16 @@ def args_for(name, a):
 SLIM = ("id", "x", "y", "shape", "kind", "inside", "yaw_deg")
 
 
+def png(path):
+    """Image bytes: local file, else from the live view (daemon on another machine, e.g. a Pi behind an SSH tunnel)."""
+    p = Path(path)
+    if p.exists():
+        return p.read_bytes()
+    import urllib.request
+
+    return urllib.request.urlopen(f"http://127.0.0.1:{arm.PORT + 1}/img/{p.name}", timeout=10).read()
+
+
 def run_tool(name, a):
     if name == "listen":  # local inbox, not the daemon
         out = arm.listen(["--wait", str(a.get("wait_s", 300))])
@@ -75,7 +85,7 @@ def run_tool(name, a):
     paths = [out["image"]] if "image" in out else list(out.get("images", {}).values())
     content = [{"type": "text", "text": txt}]
     for p in paths:
-        content.append({"type": "image", "mimeType": "image/png", "data": base64.b64encode(Path(p).read_bytes()).decode()})
+        content.append({"type": "image", "mimeType": "image/png", "data": base64.b64encode(png(p)).decode()})
     return {"content": content, "isError": not ok}
 
 

@@ -75,6 +75,18 @@ June's winner did this. It needs no kinematic model and no `calib-mark`.
 4. Use `gpick ID|X Y` and `gplace ID|X Y` instead of `pick`/`place`; `locate` works in sheet cm. Tell the operator to do the same.
 - Sim: 8/10 cube pick-and-place, interpolation error 0.6-0.9 cm. Jaw rotation assumes +1 deg of roll = +1 deg of jaw; if yaw goes the wrong way, restart with `ARM_GRID_ROLL=-1`. Taught points are saved in `runs/grid.json`; delete it to leave grid mode.
 
+## Station on a Raspberry Pi (as in June)
+Not tried on a Pi (none available); measured on the Mac.
+
+**Recommended: the Pi runs Station only; the Mac runs everything else.** Station's port goes through SSH, so nothing listens on the venue network:
+```
+ssh -N -L 8888:127.0.0.1:8888 pi@<pi-address>        # on the Pi, Station runs with --tcp 127.0.0.1:8888
+arm.py serve --backend station --station 127.0.0.1:8888 --repo <matching norma-core checkout> --robot elrobot ...
+```
+Voice (VoiceStudio, `afplay`), the live view, Claude Code and the microphone stay on the Mac and work unchanged. Camera frames cross the tunnel (480p JPEG or VP8: small).
+
+**If the daemon itself must run on the Pi:** 64-bit Raspberry Pi OS, 4 GB RAM or more (Pi 5 preferred), `uv sync`. The real-arm daemon loads kinematics only (about 490 MB, no renderer, no graphics needed). Tunnel `8765` (daemon) and `8766` (live view) to the Mac instead; `listen`, the MCP tools and images (through the live view) work across it. Limit: the robot voice uses macOS tools, so Friday is silent on a Pi (text still shows in the live view).
+
 ## If the operator is Codex
 - Codex's default sandbox blocks the CLI's connection to the daemon (verified). Start the daemon with `ARM_SOCK=$PWD/runs/arm.sock` and give the operator the same variable: the socket works under `codex sandbox --allow-unix-socket <path>` (verified), but how a running Codex session is given that permission is not verified (the config key did not work in my test). If Codex asks to run a command outside the sandbox, that approval is the fallback.
 - Codex is installed in `tools/codex` (0.169.1); log in yourself with `tools/codex/node_modules/.bin/codex login`.
