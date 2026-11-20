@@ -93,7 +93,7 @@ For any of these, decline in one sentence and offer what you can do instead.
 ## Rules
 
 1. Run **one** physical command per step, and read its output before the next. Never chain picks.
-2. Run `park` before every `look top` or `locate` (the MCP tools do this for you; on the CLI, do it yourself). The arm hides objects otherwise.
+2. `locate` parks the arm by itself. Run `park` before `look top`: the arm hides objects otherwise.
 3. Run `locate` (or `look`) again before every pick. Picks and places can nudge nearby objects by a few cm.
 4. After `pick`:
    - If `holding` is false, run `park`, then `locate`, and retry. Retry at most 3 times per object.
