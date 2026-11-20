@@ -346,7 +346,7 @@ class StationBackend(SimBackend):
         return {"torque": "off"}
 
 
-SHEET_CM = {0: (5.0, 5.5), 1: (15.0, 5.5), 2: (5.0, 18.5), 3: (15.0, 18.5)}  # marker centres on aruco_markers_A4.png at 300 dpi
+SHEET_CM = {0: (5.0, 5.5), 1: (15.0, 5.5), 2: (5.0, 18.5), 3: (15.0, 18.5)}  # marker centres on venue/aruco_markers_A4.png at 300 dpi
 
 
 def speak(text):
@@ -507,7 +507,7 @@ class Arm:
         corners, ids, _ = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)).detectMarkers(gray)
         ids = [] if ids is None else [int(i) for i in ids.flatten()]
         if sorted(ids) != [0, 1, 2, 3]:
-            raise RuntimeError(f"need markers 0-3 of aruco_markers_A4.png, saw {ids}")
+            raise RuntimeError(f"need markers 0-3 of venue/aruco_markers_A4.png, saw {ids}")
         px = {i: c[0].mean(0) for i, c in zip(ids, corners)}
         H = cv2.getPerspectiveTransform(np.float32([SHEET_CM[i] for i in range(4)]) / 100, np.float32([px[i] for i in range(4)]))
         self.b.H_sheet = {**getattr(self.b, "H_sheet", {}), cam: H}
@@ -994,7 +994,7 @@ def selfcheck(argv):
         import cv2
         import numpy as np
 
-        img = cv2.imread(str(Path(__file__).parent / "aruco_markers_A4.png"), 0)
+        img = cv2.imread(str(Path(__file__).parent / "venue" / "aruco_markers_A4.png"), 0)
         _, ids, _ = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)).detectMarkers(img)
         assert ids is not None and len(ids) == 4, f"found {ids}"
         return f"marker ids {sorted(int(i) for i in ids.flatten())}"

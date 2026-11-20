@@ -4,7 +4,7 @@ Everything below is untested on real hardware. Record what you see in `CHANGELOG
 
 ## Before leaving (each laptop)
 1. `.venv/bin/python arm.py selfcheck --repo <norma-core checkout>` must print `ALL OK`.
-2. Print `aruco_markers_A4.png` at 100%, no scaling. Measure a marker: 50 mm.
+2. Print `venue/aruco_markers_A4.png` at 100%, no scaling. Measure a marker: 50 mm.
 3. Station binary: `venue/bin/station` (arm64 macOS, built from norma-core 6b494f7, plus one local patch so the built-in camera is listed; sha256 in CHANGELOG). On Linux, build from source instead.
 4. Allow camera access for the terminal app you start it from (macOS asks once).
 

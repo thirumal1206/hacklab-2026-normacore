@@ -18,9 +18,9 @@ cd operator && claude                                     # terminal 3: approve 
 Follow `venue/VENUE.md`: Station version and address, `arm.py bringup` (joint directions, gripper, calibration), smoke test, then the operator. The taught-grid fallback there needs no kinematic model.
 
 ## Documents
-- `DESIGN.md`: architecture and decisions
-- `RESEARCH.md`: what other teams and papers found
-- `CHANGELOG.md`: every experiment with its numbers
+- `docs/DESIGN.md`: architecture and decisions
+- `docs/RESEARCH.md`: what other teams and papers found
+- `CHANGELOG.md` and `changelog.d/`: every experiment with its numbers
 - `AGENTS.md`: rules for agents changing this repo
 - `operator/AGENTS.md`: rules for the agent driving the robot
 - `CONTRIBUTING.md`: how we work

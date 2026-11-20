@@ -1,6 +1,6 @@
 # NormaCore track: design
 
-Track (from the acceptance email): integrate the Station API into Codex or Claude so it can control the robot by looking through the cameras. The exact task and the judging are announced at the opening on Sat 21 Nov. Replaces `PLAN.md`.
+Track (from the acceptance email): integrate the Station API into Codex or Claude so it can control the robot by looking through the cameras. The exact task and the judging are announced at the opening on Sat 21 Nov. Replaces `docs/archive/PLAN.md`.
 
 ## 1. Thesis
 
@@ -52,7 +52,7 @@ Claude Code / Codex  --shell-->  arm.py (CLI)  --HTTP 127.0.0.1-->  arm.py serve
   - `snap`: inside `pick X Y` with no yaw. It refines the LLM's rough point to the nearest object's centre and yaw.
 - **Camera-to-table mapping:** a homography per fixed camera.
   - Sim: computed from the MJCF camera.
-  - Real arm: `calibrate CAM` detects the ArUco markers from `aruco_markers_A4.png`. Then `calib-mark ID` records the gripper tip's FK position on each marker centre. This needs no ruler and no base-frame guess, and gives a reprojection error. The tip itself is the reference, so homography errors and kinematic errors partly cancel.
+  - Real arm: `calibrate CAM` detects the ArUco markers from `venue/aruco_markers_A4.png`. Then `calib-mark ID` records the gripper tip's FK position on each marker centre. This needs no ruler and no base-frame guess, and gives a reprojection error. The tip itself is the reference, so homography errors and kinematic errors partly cancel.
 - **Real joints:** degrees = (raw − mid(range)) / (4096/360), the same convention as LeRobot's `so101_follower` and the MJCF. The per-joint `SIGN` must be checked at the venue (§6, step 3). Gripper: 0–100 over the calibrated range.
 
 ## 4. CLI or MCP
