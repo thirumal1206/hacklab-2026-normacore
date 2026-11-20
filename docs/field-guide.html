@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Friday Arm Field Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a field guide. Sticky section rail on wide screens, one column of figure "plates" that each explain one mechanism. */
+:root {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --ink: #161a22;
+  --muted: #5b6372;
+  --line: #d6dae2;
+  --accent: #0f6fde;      /* servo blue: the robot/code side */
+  --accent-soft: #e2eefc;
+  --llm: #8a4bdb;         /* model side */
+  --llm-soft: #f1e9fc;
+  --voice: #c2610c;       /* voice side */
+  --voice-soft: #fcefe2;
+  --ok: #1d8a4e; --ok-soft: #e1f3e8;
+  --warn: #b7791f; --warn-soft: #fbf1dc;
+  --bad: #c0362c; --bad-soft: #fbe5e3;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1218; --panel: #171b23; --ink: #e8ebf1; --muted: #9aa3b2; --line: #2a303b;
+  --accent: #5aa6ff; --accent-soft: #15243a; --llm: #b98bff; --llm-soft: #251a38;
+  --voice: #f0964a; --voice-soft: #33220f; --ok: #4cc485; --ok-soft: #12301f;
+  --warn: #e3b04f; --warn-soft: #33280f; --bad: #f07368; --bad-soft: #3a1a17; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1218; --panel: #171b23; --ink: #e8ebf1; --muted: #9aa3b2; --line: #2a303b;
+  --accent: #5aa6ff; --accent-soft: #15243a; --llm: #b98bff; --llm-soft: #251a38;
+  --voice: #f0964a; --voice-soft: #33220f; --ok: #4cc485; --ok-soft: #12301f;
+  --warn: #e3b04f; --warn-soft: #33280f; --bad: #f07368; --bad-soft: #3a1a17; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 36px; }
+nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; display: grid; gap: 4px; font-size: 13px }
+nav.rail a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 6px }
+nav.rail a:hover, nav.rail a:focus-visible { color: var(--ink); background: var(--panel); outline: none }
+nav.rail .k { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 10px 8px }
+main { min-width: 0; display: grid; gap: 28px }
+h1 { font: 800 clamp(30px, 4.4vw, 46px)/1.05 var(--display); letter-spacing: -.02em; margin: 0; text-wrap: balance }
+h2 { font: 700 22px/1.2 var(--display); margin: 0; letter-spacing: -.01em; text-wrap: balance }
+h3 { font: 600 15px/1.3 var(--body); margin: 0 }
+p { margin: 0; max-width: 68ch }
+.lede { color: var(--muted); font-size: 16px; max-width: 70ch }
+.eyebrow { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.plate { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: grid; gap: 16px; scroll-margin-top: 20px }
+.plate > header { display: grid; gap: 6px }
+.mono { font-family: var(--mono); font-size: 12.5px }
+.scroll { overflow-x: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px }
+
+/* hero facts */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
+.fact { border-top: 2px solid var(--ink); padding-top: 10px; display: grid; gap: 2px }
+.fact b { font: 700 26px var(--display); font-variant-numeric: tabular-nums }
+.fact span { color: var(--muted); font-size: 13px }
+
+/* architecture */
+.arch { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 10px; min-width: 760px; position: relative }
+.lane { border-radius: 10px; padding: 12px; display: grid; gap: 8px; align-content: start }
+.lane > .eyebrow { margin-bottom: 2px }
+.lane.v { background: var(--voice-soft) } .lane.m { background: var(--llm-soft) } .lane.c { background: var(--accent-soft) } .lane.h { background: color-mix(in srgb, var(--muted) 14%, transparent) }
+.node { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; display: grid; gap: 2px }
+.node b { font-size: 13.5px } .node small { color: var(--muted); font-size: 12px; line-height: 1.4 }
+.node .tag { font: 500 10.5px var(--mono); color: var(--muted) }
+.wire { font: 500 11.5px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 6px; padding: 2px 4px }
+.wire::before { content: ""; flex: 0 0 18px; height: 2px; background: currentColor; opacity: .6 }
+
+/* sequence diagram */
+.seq { --cols: 6; display: grid; grid-template-columns: repeat(var(--cols), minmax(110px, 1fr)); min-width: 760px; position: relative; }
+.seq .actor { text-align: center; padding: 8px 6px; border-radius: 8px; font-size: 12.5px; font-weight: 600; margin: 0 6px 6px; border: 1px solid var(--line); background: var(--panel) }
+.seq .actor small { display: block; font: 400 11px var(--mono); color: var(--muted) }
+.seq .life { grid-row: 2 / span 99; border-left: 1.5px dashed var(--line); justify-self: center; width: 0 }
+.seq .msg { position: relative; height: 34px; display: flex; align-items: center }
+.seq .msg .bar { position: absolute; left: 50%; right: 50%; height: 2px; top: 50%; background: var(--c, var(--ink)) }
+.seq .msg .lbl { position: absolute; left: 0; right: 0; top: 0; text-align: center; font: 500 11.5px var(--mono); color: var(--c, var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px }
+.seq .msg.r .bar::after, .seq .msg.l .bar::before { content: ""; position: absolute; top: -4px; border: 5px solid transparent }
+.seq .msg.r .bar::after { right: -2px; border-left-color: var(--c, var(--ink)); border-right: 0 }
+.seq .msg.l .bar::before { left: -2px; border-right-color: var(--c, var(--ink)); border-left: 0 }
+.seq .msg.self .lbl { text-align: left; padding-left: 14px }
+.seq .msg.self .bar { left: 50%; right: auto; width: 12px; height: 18px; top: 4px; background: none; border: 2px solid var(--c, var(--ink)); border-left: 0; border-radius: 0 6px 6px 0 }
+.seq .note { margin: 4px 6px; font-size: 12px; padding: 5px 9px; border-radius: 6px; background: var(--warn-soft); color: var(--ink); border-left: 3px solid var(--warn) }
+
+/* pick pipeline */
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px }
+.stage { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; align-content: start; position: relative }
+.stage .n { font: 500 11px var(--mono); color: var(--accent) }
+.stage ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; display: grid; gap: 3px }
+.stage.llm { border-color: var(--llm); background: var(--llm-soft) } .stage.llm .n { color: var(--llm) }
+
+/* safety rings */
+.rings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 22px; align-items: center }
+.ring-svg { width: 100%; max-width: 380px; justify-self: center }
+.ring-list { display: grid; gap: 10px }
+.ring-list div { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: start }
+.ring-list i { width: 14px; height: 14px; border-radius: 50%; margin-top: 3px }
+.ring-list small { color: var(--muted); display: block; font-size: 12.5px }
+
+/* charts */
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px }
+.chart { display: grid; gap: 8px; align-content: start }
+.bars { display: grid; gap: 7px }
+.bar-row { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 54px; gap: 10px; align-items: center; font-size: 12.5px }
+.bar-row .track { height: 14px; background: color-mix(in srgb, var(--muted) 16%, transparent); border-radius: 4px; overflow: hidden }
+.bar-row .fill { height: 100%; border-radius: 4px; background: var(--accent) }
+.bar-row .v { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; text-align: right }
+.bar-row .lab { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.fill.ok { background: var(--ok) } .fill.warn { background: var(--warn) } .fill.bad { background: var(--bad) } .fill.llm { background: var(--llm) }
+
+/* journey */
+.journey { display: grid; gap: 0 }
+.step { display: grid; grid-template-columns: 112px 22px minmax(0, 1fr); gap: 12px }
+.step .when { font: 500 11.5px var(--mono); color: var(--muted); text-align: right; padding-top: 3px }
+.step .dot { position: relative }
+.step .dot::before { content: ""; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: var(--line) }
+.step .dot::after { content: ""; position: absolute; left: 4px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--panel); border: 3px solid var(--s, var(--muted)) }
+.step .body { padding-bottom: 16px; display: grid; gap: 3px }
+.step .body small { color: var(--muted) }
+.pill { display: inline-block; font: 500 10.5px var(--mono); padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px }
+.pill.ok { background: var(--ok-soft); color: var(--ok) } .pill.warn { background: var(--warn-soft); color: var(--warn) } .pill.bad { background: var(--bad-soft); color: var(--bad) } .pill.info { background: var(--accent-soft); color: var(--accent) }
+
+/* status board */
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+.col { border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start }
+.col.ok { background: var(--ok-soft) } .col.warn { background: var(--warn-soft) } .col.bad { background: var(--bad-soft) }
+.col h3 { display: flex; justify-content: space-between }
+.col ul { margin: 0; padding-left: 16px; display: grid; gap: 5px; font-size: 13px }
+
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr) } nav.rail { display: none }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .pipe, .charts, .board, .rings { grid-template-columns: minmax(0, 1fr) }
+  .bar-row { grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 48px }
+  .step { grid-template-columns: 76px 22px minmax(0, 1fr) }
+}
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width .6s ease } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <nav class="rail" aria-label="Sections">
+    <div class="k">Field guide</div>
+    <a href="#top">Overview</a>
+    <a href="#system">The system</a>
+    <a href="#command">A voice command</a>
+    <a href="#interrupt">Interrupting</a>
+    <a href="#pick">How a pick works</a>
+    <a href="#safety">Safety layers</a>
+    <a href="#results">Measured results</a>
+    <a href="#journey">What we tried</a>
+    <a href="#status">Where we stand</a>
+  </nav>
+
+  <main>
+    <section id="top" style="display:grid;gap:14px">
+      <div class="eyebrow">HackLab Robotics × BRISA · NormaCore track · 21–22 Nov 2026</div>
+      <h1>Friday: an LLM that runs a robot arm by looking through its cameras</h1>
+      <p class="lede">The model decides what to do and checks whether it worked. Ordinary code measures, plans the joint angles and keeps the arm safe. Everything below was built and measured in a MuJoCo simulation; the real arm is still untested.</p>
+      <div class="facts">
+        <div class="fact"><b>12/12</b><span>cubes boxed by fresh operators (3 runs)</span></div>
+        <div class="fact"><b>11/12</b><span>pen, cup, eraser, tape roll boxed</span></div>
+        <div class="fact"><b>$0.015</b><span>per 5-command voice session on Haiku</span></div>
+        <div class="fact"><b>0</b><span>runs on the real arm so far</span></div>
+      </div>
+    </section>
+
+    <section class="plate" id="system">
+      <header>
+        <div class="eyebrow">Plate 1 · Architecture</div>
+        <h2>Four layers, one rule: the model never touches a motor</h2>
+        <p>Each layer only talks to its neighbour. The daemon is the single gatekeeper: every move passes its safety checks, and arm commands run one at a time.</p>
+      </header>
+      <div class="legend"><span><i style="background:var(--voice)"></i>voice and screen</span><span><i style="background:var(--llm)"></i>the model</span><span><i style="background:var(--accent)"></i>our code</span><span><i style="background:var(--muted)"></i>hardware</span></div>
+      <div class="scroll">
+        <div class="arch">
+          <div class="lane v">
+            <div class="eyebrow">You</div>
+            <div class="node"><b>Live view</b><small>Browser page: latest camera image, command log, Friday's lines</small><span class="tag">arm.py view · :8766</span></div>
+            <div class="wire">"Friday, …" wake word</div>
+            <div class="node"><b>Hands-free mic</b><small>Browser speech recognition; echo filter drops Friday's own words</small></div>
+            <div class="node"><b>Speaker</b><small>VoiceStudio voice (af_heart), one line at a time, cut off when you talk</small></div>
+          </div>
+          <div class="lane m">
+            <div class="eyebrow">Operator</div>
+            <div class="node"><b>Claude Code</b><small>Haiku for the voice assistant, Sonnet for long autonomous tasks. Reads <span class="mono">operator/AGENTS.md</span></small></div>
+            <div class="wire">MCP tools</div>
+            <div class="node"><b>mcp_server.py</b><small>listen · locate · pick · place · push · say · gesture · stop. Images come back inline</small></div>
+            <div class="node"><b>Codex</b><small>Same CLI; needs the unix-socket route in its sandbox</small></div>
+          </div>
+          <div class="lane c">
+            <div class="eyebrow">arm.py daemon</div>
+            <div class="node"><b>Skills</b><small>locate, snap, pick, place (free corner), push, taught grid, gestures</small></div>
+            <div class="node"><b>Geometry</b><small>Camera→table homography (ArUco), IK for SO-101 and ElRobot</small></div>
+            <div class="node"><b>Safety gate</b><small>Workspace, z floor, speed cap, stop words, stall / overload hold</small></div>
+            <div class="node"><b>Backend</b><small><span class="mono">SimBackend</span> (MuJoCo) or <span class="mono">StationBackend</span> (real arm)</small></div>
+          </div>
+          <div class="lane h">
+            <div class="eyebrow">Hardware</div>
+            <div class="node"><b>NormaCore Station</b><small>TCP 8888, protobuf queues. Possibly on a Raspberry Pi, reached over SSH</small><span class="tag">commands · st3215/inference · usbvideo/&lt;md5&gt;</span></div>
+            <div class="node"><b>ElRobot arm</b><small>8 ST3215 servos: 7 joints + gripper (motor 8)</small></div>
+            <div class="node"><b>2 USB cameras</b><small>Fixed overhead + wrist. JPEG or VP8 frames</small></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="plate" id="command">
+      <header>
+        <div class="eyebrow">Plate 2 · Sequence</div>
+        <h2>"Friday, put the red cube in the box"</h2>
+        <p>One spoken request, end to end. Friday narrates nothing; she says one line when the camera has confirmed the result.</p>
+      </header>
+      <div class="scroll"><div class="seq" id="seq1"></div></div>
+    </section>
+
+    <section class="plate" id="interrupt">
+      <header>
+        <div class="eyebrow">Plate 3 · Sequence</div>
+        <h2>Talking over her: "Friday, stop"</h2>
+        <p>Hearing the wake word cuts her voice at once. A stop word freezes the arm in the middle of a move, and nothing moves again until the model has listened.</p>
+      </header>
+      <div class="scroll"><div class="seq" id="seq2"></div></div>
+    </section>
+
+    <section class="plate" id="pick">
+      <header>
+        <div class="eyebrow">Plate 4 · Pipeline</div>
+        <h2>How a pick works</h2>
+        <p>The model only chooses the target id. Every other step is code, and each step either succeeds or reports why, so the model can retry or ask.</p>
+      </header>
+      <div class="pipe">
+        <div class="stage llm"><span class="n">choose · model</span><h3>Pick a numbered mark</h3><ul><li><span class="mono">locate</span> lists objects with id, shape, position, container</li><li>Model picks <span class="mono">red</span>; never raw pixels</li></ul></div>
+        <div class="stage"><span class="n">see · code</span><h3>Find it precisely</h3><ul><li>Colour masks + empty-table difference</li><li>Homography → table cm</li><li><span class="mono">snap</span> recentres and reads the yaw</li></ul></div>
+        <div class="stage"><span class="n">plan · code</span><h3>Solve the joints</h3><ul><li>IK, gripper pointing down</li><li>Several seed postures</li><li>Arrive from above, lower travel height if needed</li></ul></div>
+        <div class="stage"><span class="n">grasp · code</span><h3>Close and lift</h3><ul><li>Descend to 1.2 cm</li><li>Real arm: close in steps, stop when the jaws stop</li><li>Lift in 3 short steps</li><li>Missed? rotate jaws 90° and retry once</li></ul></div>
+        <div class="stage llm"><span class="n">verify · model</span><h3>Look again</h3><ul><li><span class="mono">place box</span> drops in a free corner</li><li><span class="mono">locate</span> confirms "inside"</li><li>Only then: "Done."</li></ul></div>
+      </div>
+    </section>
+
+    <section class="plate" id="safety">
+      <header>
+        <div class="eyebrow">Plate 5 · Defence in depth</div>
+        <h2>Five rings between a sentence and a servo</h2>
+        <p>The outer rings guide the model; the inner rings hold even if the model is wrong. Nothing safety-critical depends on the prompt.</p>
+      </header>
+      <div class="rings">
+        <svg class="ring-svg" viewBox="0 0 360 360" role="img" aria-label="Concentric safety rings">
+          <circle cx="180" cy="180" r="172" fill="var(--llm-soft)" stroke="var(--llm)" stroke-width="2"/>
+          <circle cx="180" cy="180" r="136" fill="var(--panel)" stroke="var(--llm)" stroke-width="2"/>
+          <circle cx="180" cy="180" r="100" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <circle cx="180" cy="180" r="64" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
+          <circle cx="180" cy="180" r="30" fill="var(--bad-soft)" stroke="var(--bad)" stroke-width="2"/>
+          <text x="180" y="28" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--llm)">1 · operator rules</text>
+          <text x="180" y="64" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--llm)">2 · MCP tool list</text>
+          <text x="180" y="100" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">3 · daemon gate</text>
+          <text x="180" y="136" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">4 · Station backend</text>
+          <text x="180" y="184" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="var(--bad)">5 · relax</text>
+        </svg>
+        <div class="ring-list">
+          <div><i style="background:var(--llm)"></i><p><b>Operator rules.</b> <small>One physical command per step, re-locate before each pick, refuse throwing or moving toward people, "Done" only after the camera confirms.</small></p></div>
+          <div><i style="background:var(--llm)"></i><p><b>MCP tool list.</b> <small>Only safe verbs exist. No score, reset or teleport tools; nothing takes joint angles from the model.</small></p></div>
+          <div><i style="background:var(--accent)"></i><p><b>Daemon gate.</b> <small>Workspace box, 0.8 cm z floor, IK must reach the target, stop words freeze motion, one arm command at a time on one thread.</small></p></div>
+          <div><i style="background:var(--accent)"></i><p><b>Station backend.</b> <small>Follower bus pinned, uncalibrated motors refused, speed 250 / accel 10, goals clamped to calibrated range, stall and overload hold position, stale camera feed rejected.</small></p></div>
+          <div><i style="background:var(--bad)"></i><p><b>relax.</b> <small>Torque off on every motor: the emergency stop, with a hand on the arm during first runs.</small></p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="plate" id="results">
+      <header>
+        <div class="eyebrow">Plate 6 · Measured in simulation</div>
+        <h2>What the numbers say</h2>
+        <p>Success is the simulator's hidden score, which the operator never sees. Each operator was a fresh model session with only the CLI help or MCP tools and the task.</p>
+      </header>
+      <div class="charts">
+        <div class="chart">
+          <h3>Objects placed in the box</h3>
+          <div class="bars" id="succ"></div>
+        </div>
+        <div class="chart">
+          <h3>Cost of the same 5 voice commands</h3>
+          <div class="bars" id="cost"></div>
+          <h3 style="margin-top:10px">Real-arm daemon memory</h3>
+          <div class="bars" id="mem"></div>
+          <h3 style="margin-top:10px">IK solve time, Python vs Rust</h3>
+          <div class="bars" id="rust"></div>
+        </div>
+      </div>
+      <p class="mono" style="color:var(--muted)">Grasp-only benchmark over 10 seeds: red cube 8/10, cup 8/10, pencil lying flat 0/10 (jaw tips stop 0.6 cm above the table; the pencil is 0.7 cm tall).</p>
+    </section>
+
+    <section class="plate" id="journey">
+      <header>
+        <div class="eyebrow">Plate 7 · Timeline</div>
+        <h2>What we tried, in order</h2>
+        <p>Green kept, amber kept with limits, red dropped. Most decisions came from a measurement, not a guess.</p>
+      </header>
+      <div class="journey" id="steps"></div>
+    </section>
+
+    <section class="plate" id="status">
+      <header>
+        <div class="eyebrow">Plate 8 · Status</div>
+        <h2>Where we stand before Saturday</h2>
+      </header>
+      <div class="board">
+        <div class="col ok"><h3>Works in simulation <span class="pill ok">measured</span></h3><ul>
+          <li>Locate, pick, place, recover from a knocked-out object</li><li>Non-cube objects: pen, cup, eraser, tape</li><li>Friday: hands-free, interruptible, refuses unsafe asks</li><li>MCP and CLI; Haiku at about $0.02 per task</li><li>Station client, VP8 frames, bus and calibration guards</li></ul></div>
+        <div class="col warn"><h3>Built, not proven <span class="pill warn">unverified</span></h3><ul>
+          <li>ElRobot joint directions and gripper polarity</li><li>Camera calibration error on the printed sheet</li><li>Stall and overload hold on real servos</li><li>Echo filter with laptop speakers</li><li>Station on a Raspberry Pi over SSH</li></ul></div>
+        <div class="col bad"><h3>Known gaps <span class="pill bad">open</span></h3><ul>
+          <li>Flat objects like a pencil lying down</li><li>Picking from a crowded box disturbs neighbours</li><li>Collisions with the table are not modelled</li><li>No click-to-teach or camera auto-rebind yet</li></ul></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const C = { you: "var(--voice)", llm: "var(--llm)", code: "var(--accent)", hw: "var(--muted)", warn: "var(--warn)" };
+
+function seq(el, actors, rows) {
+  el.style.setProperty("--cols", actors.length);
+  actors.forEach((a, i) => {
+    const d = document.createElement("div"); d.className = "actor";
+    d.style.gridColumn = i + 1; d.style.gridRow = 1;
+    d.style.borderColor = a.c; d.innerHTML = a.n + "<small>" + a.s + "</small>"; el.appendChild(d);
+    const l = document.createElement("div"); l.className = "life"; l.style.gridColumn = i + 1; el.appendChild(l);
+  });
+  rows.forEach((r, k) => {
+    const row = k + 2;
+    if (r.note) {
+      const n = document.createElement("div"); n.className = "note"; n.textContent = r.note;
+      n.style.gridColumn = "1 / -1"; n.style.gridRow = row; el.appendChild(n); return;
+    }
+    const [f, t] = [r.f, r.t]; const m = document.createElement("div");
+    const lo = Math.min(f, t), hi = Math.max(f, t);
+    m.className = "msg " + (f === t ? "self" : f < t ? "r" : "l");
+    m.style.gridRow = row; m.style.gridColumn = f === t ? (f + 1) + " / span 2" : (lo + 1) + " / " + (hi + 2);
+    if (f === t && f === actors.length - 1) m.style.gridColumn = (f) + " / span 2";
+    m.style.setProperty("--c", r.c || "var(--ink)");
+    const span = hi - lo + 1, half = 50 / span;
+    m.innerHTML = '<div class="bar"></div><div class="lbl"></div>';
+    if (f !== t) { const b = m.firstChild; b.style.left = half + "%"; b.style.right = half + "%"; }
+    else { m.firstChild.style.left = (f === actors.length - 1 ? 75 : 25) + "%"; m.lastChild.style.paddingLeft = (f === actors.length - 1 ? "52%" : "30%"); }
+    m.lastChild.textContent = r.m; m.title = r.m; el.appendChild(m);
+  });
+}
+
+seq(document.getElementById("seq1"), [
+  { n: "You", s: "browser", c: C.you }, { n: "Live view", s: ":8766 inbox", c: C.you },
+  { n: "Claude", s: "operator", c: C.llm }, { n: "arm.py", s: "daemon", c: C.code },
+  { n: "Station", s: ":8888", c: C.hw }, { n: "Speaker", s: "VoiceStudio", c: C.you }
+], [
+  { f: 0, t: 1, m: '"Friday, put the red cube in the box"', c: C.you },
+  { f: 1, t: 1, m: "wake word → append to inbox", c: C.you },
+  { f: 2, t: 3, m: "listen()", c: C.llm },
+  { f: 3, t: 2, m: "instruction: put the red cube in the box", c: C.code },
+  { f: 2, t: 3, m: "locate()", c: C.llm },
+  { f: 3, t: 4, m: "park arm · read top camera frame", c: C.code },
+  { f: 3, t: 2, m: "objects: red, blue, green-box … (text, no image)", c: C.code },
+  { f: 2, t: 3, m: "pick(id=red)", c: C.llm },
+  { f: 3, t: 3, m: "snap → IK → safety gate", c: C.code },
+  { f: 3, t: 4, m: "sync-write speed + goal ticks, watch progress", c: C.code },
+  { f: 3, t: 2, m: "holding: true", c: C.code },
+  { f: 2, t: 3, m: "place(id=green-box) → free corner", c: C.llm },
+  { f: 2, t: 3, m: "locate() → red inside green-box", c: C.llm },
+  { f: 2, t: 3, m: 'say("Done. The red cube is in the box.")', c: C.llm },
+  { f: 3, t: 5, m: "one line per instruction (+ a quip 1 in 4)", c: C.code },
+  { note: "Typical cost on Haiku: about 6 tool calls and well under one cent for this request." }
+]);
+
+seq(document.getElementById("seq2"), [
+  { n: "You", s: "browser", c: C.you }, { n: "Live view", s: ":8766", c: C.you },
+  { n: "arm.py", s: "daemon", c: C.code }, { n: "Station", s: "motors", c: C.hw },
+  { n: "Claude", s: "operator", c: C.llm }, { n: "Speaker", s: "VoiceStudio", c: C.you }
+], [
+  { f: 4, t: 2, m: "pick(id=blue) in progress", c: C.llm },
+  { f: 2, t: 3, m: "goal ticks sent, arm moving", c: C.code },
+  { f: 0, t: 1, m: '"Friday, st…" (partial transcript)', c: C.you },
+  { f: 1, t: 2, m: "hush (wake word heard)", c: C.you },
+  { f: 2, t: 5, m: "cut the current line, drop the queue", c: C.code },
+  { f: 1, t: 2, m: 'final: "stop" → inbox', c: C.you },
+  { f: 2, t: 3, m: "stop heard → goal = present position (hold)", c: C.code },
+  { f: 2, t: 4, m: 'error: stopped · heard_while_busy: ["stop"]', c: C.warn },
+  { f: 4, t: 2, m: "listen() → stop", c: C.llm },
+  { f: 4, t: 2, m: 'say("Stopped. The blue cube is still in the gripper.")', c: C.llm },
+  { note: "Until the model calls listen(), every move is refused, so a stop cannot be missed." }
+]);
+
+function bars(id, rows, max, fmt) {
+  const el = document.getElementById(id);
+  rows.forEach(r => {
+    const d = document.createElement("div"); d.className = "bar-row";
+    d.innerHTML = '<span class="lab"></span><div class="track"><div class="fill ' + (r.k || "") + '"></div></div><span class="v"></span>';
+    d.querySelector(".lab").textContent = r.l; d.querySelector(".lab").title = r.l;
+    d.querySelector(".fill").style.width = Math.max(1.5, 100 * r.v / max) + "%";
+    d.querySelector(".v").textContent = fmt(r); el.appendChild(d);
+  });
+}
+const frac = r => r.a + "/" + r.b;
+bars("succ", [
+  { l: "Grid reading only (no CV)", a: 3, b: 4, k: "warn" },
+  { l: "With locate (CV marks)", a: 4, b: 4, k: "ok" },
+  { l: "Fresh operators, 3 runs", a: 12, b: 12, k: "ok" },
+  { l: "Non-cube objects, first try", a: 1, b: 4, k: "bad" },
+  { l: "Non-cube objects, after fixes", a: 11, b: 12, k: "ok" },
+  { l: "Tidy + knock-out, Sonnet", a: 4, b: 4, k: "ok" },
+  { l: "Tidy + knock-out, Haiku", a: 4, b: 4, k: "ok" },
+  { l: "Mixed objects, Haiku (spread fix)", a: 4, b: 4, k: "ok" },
+  { l: "With a flat pencil", a: 3, b: 4, k: "warn" }
+].map(r => ({ ...r, v: r.a / r.b })), 1, frac);
+bars("cost", [
+  { l: "Sonnet, before tuning", v: 0.21, k: "llm" },
+  { l: "Sonnet, fewer turns", v: 0.17, k: "llm" },
+  { l: "Haiku, same tuning", v: 0.015, k: "ok" }
+], 0.21, r => "$" + r.v.toFixed(3).replace(/0$/, ""));
+bars("mem", [
+  { l: "Built the full simulator", v: 812, k: "warn" },
+  { l: "Kinematics only", v: 492, k: "ok" }
+], 812, r => r.v + " MB");
+bars("rust", [
+  { l: "Python (NumPy, MuJoCo)", v: 2.31, k: "warn" },
+  { l: "Rust port (not wired in)", v: 0.026, k: "ok" }
+], 2.31, r => r.v + " ms");
+
+const steps = [
+  ["early Nov", "Hugging Face plan: train ACT/SmolVLA on SO-101", "Dropped when the track turned out to be NormaCore, and research showed ~100 demos per task.", "bad", "dropped"],
+  ["19 Nov", "Built and ran NormaCore Station locally", "Found it needs cmake/protoc, --tcp to listen, and only lists external cameras on macOS.", "ok", "kept"],
+  ["19 Nov", "CLI first, MCP later; no CLI generator", "A ten-command CLI was smaller and testable from a shell. MCP added on top when it paid off.", "ok", "kept"],
+  ["19 Nov", "Model reads positions off a cm grid", "Within 0.3–1.0 cm, but yaw was wrong. So positions may come from the model, orientation from pixels.", "warn", "limits"],
+  ["19 Nov", "Numbered marks + snap + retry", "12/12 cubes over 3 runs with fresh operators.", "ok", "kept"],
+  ["20 Nov", "ElRobot kinematics from the URDF", "Gripper-down reach only up to x 26 cm, z 10 cm. Joint directions unverified.", "warn", "limits"],
+  ["20 Nov", "Non-cube objects without colour", "1/4 → 11/12 after colour-free segmentation, multi-seed IK and a round-object rule.", "ok", "kept"],
+  ["20 Nov", "Codex as operator", "Its sandbox blocks the daemon's TCP port; a unix socket works. Login still pending.", "warn", "limits"],
+  ["20 Nov", "Rust port of IK and segmentation", "IK 90× faster, segmentation 3× slower than OpenCV. Arm motion dominates, so not wired in.", "bad", "parked"],
+  ["20 Nov", "VP8 camera frames", "Newer Station stores VP8; decoded with OpenCV's FFmpeg, no new package.", "ok", "kept"],
+  ["20 Nov", "Flat pencil", "0/10: jaw tips stop above it. Push moves it only 2–3 cm. Friday skips it after two tries.", "bad", "open"],
+  ["20 Nov", "Taught-grid fallback", "No kinematics needed; 8/10 in sim, same as IK.", "ok", "kept"],
+  ["20 Nov", "Friday: voice, wake word, interruptions", "Overlapping voices fixed with one speaker queue; stop freezes the arm mid-move.", "ok", "kept"],
+  ["20 Nov", "Token diet + Haiku", "$0.21 → $0.015 per session; spreading moved into code because Haiku ignored the rule.", "ok", "kept"],
+  ["20 Nov", "Lean daemon for a Raspberry Pi", "812 → 492 MB; recommended split: Station on the Pi, everything else on the Mac.", "ok", "kept"],
+  ["20 Nov", "Field learnings from earlier editions", "Bus pinning, calibration guard, slow servo profile, stall/overload hold, and a corrected ElRobot joint mapping.", "ok", "kept"]
+];
+const col = { ok: "var(--ok)", warn: "var(--warn)", bad: "var(--bad)" };
+const host = document.getElementById("steps");
+steps.forEach(([w, t, d, k, p]) => {
+  const s = document.createElement("div"); s.className = "step"; s.style.setProperty("--s", col[k]);
+  s.innerHTML = '<div class="when"></div><div class="dot"></div><div class="body"><b></b><small></small></div>';
+  s.querySelector(".when").textContent = w;
+  s.querySelector("b").textContent = t;
+  const pill = document.createElement("span"); pill.className = "pill " + k; pill.textContent = p; s.querySelector("b").appendChild(pill);
+  s.querySelector("small").textContent = d; host.appendChild(s);
+});
+</script>
+
+</body>
+</html>
