@@ -27,6 +27,22 @@ from pathlib import Path
 PORT = int(os.environ.get("ARM_PORT", 8765))
 SOCK = os.environ.get("ARM_SOCK")  # unix socket path instead of TCP: Codex's sandbox blocks localhost TCP
 OUT = Path(__file__).parent / "runs"
+INBOX = OUT / "inbox.jsonl"  # spoken/typed instructions from the live view
+STOP_WORDS = ("stop", "halt", "freeze", "wait", "cancel", "abort")
+PHYSICAL = {"pick", "place", "move", "push", "grip", "joints", "gesture", "gpick", "gplace", "park"}
+
+
+def unread():
+    """Instructions said since the operator's last `listen`."""
+    lines = INBOX.read_text().splitlines() if INBOX.exists() else []
+    pos = OUT / "inbox.pos"
+    return [json.loads(x)["text"] for x in lines[int(pos.read_text()) if pos.exists() else 0:]]
+
+
+def stop_heard():
+    import re
+
+    return any(re.search(r"\b(" + "|".join(STOP_WORDS) + r")\b", t.lower()) for t in unread())
 
 # Per-robot profile. Table-frame limits (m) for any commanded gripper position; z[0] is a hard floor off the table.
 # Joint vector = n arm joints + gripper (0 closed - 100 open); park = arm upright: out of the top camera's view.
@@ -92,6 +108,8 @@ class SimBackend:
 
         start = self.q.copy()
         for t in range(1, steps + 1):
+            if t % 10 == 0 and stop_heard():
+                raise RuntimeError("stopped: a stop was said; call listen")
             self.q = start + (target - start) * t / steps
             self.w.data.ctrl[self.w.actuators] = self.w.to_ctrl(self.q)
             self.mj.mj_step(self.w.model, self.w.data, nstep=self.w.substeps)
@@ -282,6 +300,11 @@ class StationBackend(SimBackend):
         self.run(pb["send"](self.client, [sync(0x2E, speed), sync(0x2A, {j: g.to_bytes(2, "little") for j, g in goals.items()})]))
         deadline = time.time() + T + 2
         while time.time() < deadline and any(abs(self.motors[j][0] - goals[j]) > 25 for j in range(1, self.nm)):
+            if stop_heard():  # freeze where we are: goal = present position
+                here = {j: self.motors[j][0].to_bytes(2, "little") for j in goals}
+                self.run(pb["send"](self.client, [sync(0x2A, here)]))
+                self.q = self.joints()
+                raise RuntimeError("stopped: a stop was said; call listen")
             time.sleep(0.05)
         self.q = np.asarray(target, float)
 
@@ -349,30 +372,74 @@ class StationBackend(SimBackend):
 SHEET_CM = {0: (5.0, 5.5), 1: (15.0, 5.5), 2: (5.0, 18.5), 3: (15.0, 18.5)}  # marker centres on venue/aruco_markers_A4.png at 300 dpi
 
 
-def speak(text):
-    """Robot voice, non-blocking. ARM_TTS=say (default, macOS) | voicebox (local app, :17493) | off. ARM_VOICE picks the voice."""
-    import subprocess
-    import threading
+class Voice:
+    """One speaker: lines play in order, never on top of each other; hush() cuts the current line and drops the queue.
 
-    tts = os.environ.get("ARM_TTS", "say")
-    if tts == "say":
-        subprocess.Popen(["say", "-v", os.environ.get("ARM_VOICE", "Daniel"), "--", text])
-    elif tts == "voicestudio":  # OpenAI-compatible: POST /v1/audio/speech -> wav bytes; ARM_VOICE = profile name or preset
-        def run():
-            body = json.dumps({"model": os.environ.get("ARM_TTS_MODEL", "tts-1"), "input": text,
-                               "voice": os.environ.get("ARM_VOICE", "bm_george"), "response_format": "wav"}).encode()
-            req = urllib.request.Request(os.environ.get("ARM_TTS_URL", "http://127.0.0.1:3900") + "/v1/audio/speech", body,
-                                         {"Content-Type": "application/json"})
-            p = OUT / f"tts_{time.time_ns()}.wav"
-            p.write_bytes(urllib.request.urlopen(req, timeout=60).read())
-            subprocess.run(["afplay", str(p)])
-            p.unlink()
+    ARM_TTS=say (macOS) | voicestudio (local, :3900) | voicebox (local, :17493; untested) | off. ARM_VOICE picks the voice."""
 
-        threading.Thread(target=run, daemon=True).start()
-    elif tts == "voicebox":  # API from the project README, not tested: POST /speak {"text", "profile"}
-        body = json.dumps({"text": text, "profile": os.environ.get("ARM_VOICE", "Jarvis")}).encode()
-        req = urllib.request.Request("http://127.0.0.1:17493/speak", body, {"Content-Type": "application/json"})
-        threading.Thread(target=lambda: urllib.request.urlopen(req, timeout=30).read(), daemon=True).start()
+    def __init__(self):
+        import queue
+        import threading
+
+        self.q, self.proc, self.gen = queue.Queue(), None, 0
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def say(self, text):
+        self.q.put((self.gen, text))
+
+    def hush(self):
+        import queue
+
+        self.gen += 1  # lines queued before this are dropped, even if already being synthesised
+        while True:
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                break
+        p = self.proc
+        if p and p.poll() is None:
+            p.terminate()
+
+    def _run(self):
+        import subprocess
+
+        while True:
+            gen, text = self.q.get()
+            if gen != self.gen:
+                continue
+            tts = os.environ.get("ARM_TTS", "say")
+            try:
+                if tts == "say":
+                    cmd = ["say", "-v", os.environ.get("ARM_VOICE", "Daniel"), "--", text]
+                elif tts in ("voicestudio", "voicebox"):
+                    wav = OUT / f"tts_{time.time_ns()}.wav"
+                    wav.write_bytes(self._synth(tts, text))
+                    cmd = ["afplay", str(wav)]
+                else:
+                    continue
+                if gen != self.gen:  # interrupted while synthesising
+                    continue
+                with (OUT / "said.jsonl").open("a") as fh:  # the live view drops mic transcripts that echo these
+                    fh.write(json.dumps({"t": time.time(), "text": text}) + "\n")
+                (OUT / "speaking").touch()
+                self.proc = subprocess.Popen(cmd)
+                self.proc.wait()
+                (OUT / "speaking").unlink(missing_ok=True)
+            except Exception as e:  # a voice failure must never stop the robot
+                print(f"voice: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            finally:
+                for w in OUT.glob("tts_*.wav"):
+                    w.unlink(missing_ok=True)
+
+    def _synth(self, tts, text):
+        if tts == "voicestudio":  # OpenAI-compatible endpoint, returns wav bytes
+            url = os.environ.get("ARM_TTS_URL", "http://127.0.0.1:3900") + "/v1/audio/speech"
+            body = {"model": os.environ.get("ARM_TTS_MODEL", "tts-1"), "input": text,
+                    "voice": os.environ.get("ARM_VOICE", "af_heart"), "response_format": "wav"}
+        else:  # Voicebox README: POST /speak {"text", "profile"}
+            url, body = "http://127.0.0.1:17493/speak", {"text": text, "profile": os.environ.get("ARM_VOICE", "Jarvis")}
+        req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=60).read()
 
 
 def shape(sides, round_):
@@ -634,6 +701,20 @@ class Arm:
         self.grip("open")
         return {**self.move(x, y, self.b.prof["hover"] * 100), "dropped_on_the_way": dropped}
 
+    def drop_spot(self, a):
+        """`place <container id>`: a free corner of the box, not its centre (stacked objects stick out); else target()."""
+        import numpy as np
+
+        if len(a) == 1 and self.marks.get(a[0], {}).get("kind") == "container":
+            c = self.marks[a[0]]
+            half = max(1.0, min(c["size_cm"]) / 2 - 2.5)  # 2.5 cm in from the walls
+            used = [(o["x"], o["y"]) for o in self.marks.values() if o.get("inside") == a[0]] + getattr(self, "dropped", [])
+            spots = [(c["x"] + dx * half, c["y"] + dy * half) for dx, dy in ((1, 1), (-1, -1), (1, -1), (-1, 1), (0, 0))]
+            x, y = max(spots, key=lambda p: min([np.hypot(p[0] - u[0], p[1] - u[1]) for u in used] or [99]))
+            self.dropped = getattr(self, "dropped", [])[-3:] + [(x, y)]  # placed since the last locate
+            return x, y
+        return self.target(a)[:2]
+
     def target(self, a):
         """`pick 3` / `place 1` use mark ids from the last locate; otherwise X Y [--yaw D] in cm."""
         if len(a) == 1 or (len(a) > 1 and a[1].startswith("--")):
@@ -852,7 +933,7 @@ class Arm:
         # Set-of-Mark: number every blob on the image so the agent chooses an id instead of regressing coordinates.
         img = cv2.cvtColor(self.b.image(cam), cv2.COLOR_RGB2BGR)
         H = np.linalg.inv(Hinv)
-        self.marks = {}
+        self.marks, self.dropped = {}, []
         taken = []  # label rects already drawn
         for o in sorted(found, key=lambda o: (o["color"], o["x"])):
             base = o["color"] + ("-box" if o["kind"] == "container" else "")
@@ -899,12 +980,58 @@ def serve(argv):
     OUT.mkdir(exist_ok=True)
     events = OUT / "events.jsonl"  # read by `arm.py view`
     events.write_text("")
+    voice = Voice()
+
+    spoken_for = [None]
+
+    def speak_once(text):
+        """At most one spoken line per instruction; more still shows in the live view, silently."""
+        pos = OUT / "inbox.pos"
+        turn = pos.read_text() if pos.exists() else "0"
+        if spoken_for[0] == turn:
+            return {"ok": True, "spoken": False, "note": "one spoken line per instruction: shown on screen only"}
+        spoken_for[0] = turn
+        quip = pick_quip(text, turn)
+        line = f"{text} {quip}" if quip else text
+        voice.say(line)
+        return {"ok": True, "spoken": True, "said": line}
+
+    quips = json.loads((Path(__file__).parent / "operator" / "quips.json").read_text())
+    last_quip = [False]
+
+    def pick_quip(text, turn):
+        """Canned humour added by the robot, not the model: no tokens. Successes 1 in 4, never twice in a row; greeting once."""
+        import random
+
+        kind = "greet" if turn == "0" else "done" if text.lower().startswith("done") else None
+        if kind is None or last_quip[0] or (kind == "done" and random.random() > float(os.environ.get("ARM_QUIP_RATE", 0.25))):
+            last_quip[0] = False
+            return None
+        last_quip[0] = True
+        return random.choice(quips[kind])
+
+    def barge_in():  # the robot stops talking as soon as someone presses Talk or a new line arrives
+        import threading
+
+        def watch():
+            seen, hush = len(unread()), OUT / "hush"
+            while True:
+                n = len(unread())
+                if n > seen or hush.exists():
+                    voice.hush()
+                    hush.unlink(missing_ok=True)
+                seen = n
+                time.sleep(0.15)
+        threading.Thread(target=watch, daemon=True).start()
+    barge_in()
 
     class H(BaseHTTPRequestHandler):
         def do_POST(self):
             req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             cmd, a = req["cmd"], req.get("args", [])
             try:
+                if cmd in PHYSICAL and stop_heard():
+                    raise RuntimeError(f"interrupted: {unread()}; call listen before moving")
                 f = lambda i: float(a[i])
                 yaw = float(a[a.index("--yaw") + 1]) if "--yaw" in a else None
                 out = {
@@ -912,7 +1039,7 @@ def serve(argv):
                     "locate": lambda: arm.locate(),
                     "snapshot": lambda: arm.snapshot(a or ["top"]),
                     "pick": lambda: arm.pick(*arm.target(a)),
-                    "place": lambda: arm.place(*arm.target(a)[:2]),
+                    "place": lambda: arm.place(*arm.drop_spot(a)),
                     "move": lambda: arm.move(f(0), f(1), f(2), yaw),
                     "grip": lambda: arm.grip(a[0]),
                     "park": arm.park,
@@ -930,13 +1057,15 @@ def serve(argv):
                     "gpick": lambda: arm.gpick(*arm.target(a)),
                     "gplace": lambda: arm.gplace(*arm.target(a)[:2]),
                     "calibrate-sheet": lambda: arm.calibrate_sheet(a[0] if a else "top"),
-                    "say": lambda: (speak(" ".join(a)), {"ok": True})[1],  # narration: live view + voice
+                    "say": lambda: speak_once(" ".join(a)),
                     "gesture": lambda: arm.gesture(a[0]),
                     "nudge": lambda: backend.nudge(a[0], f(1), f(2)),
                 }[cmd]()
                 code = 200
             except Exception as e:  # report to the agent instead of crashing the daemon
                 out, code = {"error": f"{type(e).__name__}: {e}"}, 400
+            if isinstance(out, dict) and cmd != "say" and (u := unread()):
+                out["heard_while_busy"] = u  # the operator must listen before its next step
             body = json.dumps(out, default=lambda o: o.item()).encode()  # numpy scalars
             if cmd != "score":  # privileged rehearsal metric: keep it off the audience view
                 with events.open("a") as fh:
@@ -1134,19 +1263,32 @@ VIEW_HTML = """<!doctype html><meta charset=utf-8><title>Arm live view</title>
 #img{flex:3;display:flex;align-items:center;justify-content:center;background:#000}#img img{max-width:100%;max-height:100%}
 #side{flex:2;display:flex;flex-direction:column;min-width:0}#log{flex:1;overflow:auto;padding:12px}#f{display:flex;gap:8px;padding:12px;border-bottom:1px solid #333}#f input{flex:1;font:16px system-ui;padding:8px;background:#222;color:#fff;border:1px solid #444;border-radius:6px}#f button{font:16px system-ui;padding:8px 12px;border-radius:6px;border:0;background:#2a5;color:#fff;cursor:pointer}#f button.on{background:#c33}.heard{color:#fc6;font-size:16px}.e{padding:6px 8px;border-bottom:1px solid #222}.say{color:#fff;font-size:17px;background:#234}
 .err{color:#f88}.ok{color:#8f8}code{color:#9cf}@media(max-width:700px){body{flex-direction:column}}</style>
-<div id=img><span>waiting for an image</span></div><div id=side><form id=f><button type=button id=mic>Talk</button><input id=t placeholder="Say or type a command, Enter to send" autocomplete=off></form><div id=log></div></div>
+<div id=img><span>waiting for an image</span></div><div id=side><form id=f><button type=button id=mic>Hands-free</button><input id=t placeholder="Say or type a command, Enter to send" autocomplete=off></form><div id=log></div></div>
 <script>
 const send=t=>t&&fetch('command',{method:'POST',body:JSON.stringify({text:t})});
 const f=document.getElementById('f'),t=document.getElementById('t'),mic=document.getElementById('mic');
 f.onsubmit=e=>{e.preventDefault();send(t.value.trim());t.value=''};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\\bfriday\\b[\\s,.!?]*/i;
+const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,'').trim();
+let said='',hands=null;
+setInterval(async()=>{try{said=norm((await (await fetch('state')).json()).said)}catch(_){}},500);
+const echo=t=>{const w=norm(t).split(' ').filter(x=>x.length>2&&x!=='friday'),s=new Set(said.split(' '));
+  return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
 if(!SR)mic.disabled=true,mic.title='no speech recognition in this browser: type instead';
-else mic.onclick=()=>{const r=new SR();r.lang='en-US';mic.classList.add('on');
-r.onresult=e=>send(e.results[0][0].transcript);r.onend=()=>mic.classList.remove('on');r.start()};
+else mic.onclick=()=>{
+  if(hands){const h=hands;hands=null;h.stop();mic.classList.remove('on');mic.textContent='Hands-free';return}
+  const r=new SR();r.lang='en-US';r.continuous=true;r.interimResults=true;hands=r;
+  mic.classList.add('on');mic.textContent='Listening: say "Friday, ..."';
+  r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
+    if(!WAKE.test(t)||echo(t))continue;
+    if(!e.results[i].isFinal){fetch('hush',{method:'POST'});continue}  // barge-in on the wake word
+    const cmd=t.slice(t.search(WAKE)).replace(WAKE,'').trim();send(cmd||'yes?')}};
+  r.onend=()=>{if(hands===r)r.start()};  // Chrome ends sessions after silence: keep listening
+  r.start()};
 let n=0;const log=document.getElementById('log'),box=document.getElementById('img');
 async function tick(){try{const ev=await (await fetch('events?since='+n)).json();
 for(const e of ev){n++;const d=document.createElement('div');const r=e.out||{};
-if(e.cmd==='say'){d.className='e say';d.textContent=e.args.join(' ')}
+if(e.cmd==='say'){d.className='e say';d.textContent=r.said||e.args.join(' ')}
 else if(e.cmd==='heard'){d.className='e heard';d.textContent='You: '+e.args.join(' ')}
 else{d.className='e';const t=new Date(e.t*1000).toLocaleTimeString();
 let s=r.error?`<span class=err>${r.error}</span>`:'holding' in r?`<span class=${r.holding?'ok':'err'}>holding: ${r.holding}</span>`:
@@ -1155,9 +1297,6 @@ d.innerHTML=`${t} <code>${e.cmd} ${e.args.join(' ')}</code> ${s}`}
 log.prepend(d);const im=r.image||(r.images&&(r.images.top||Object.values(r.images)[0]));
 if(im)box.innerHTML='<img src="img/'+im.split('/').pop()+'">'}}catch(_){}setTimeout(tick,700)}tick();
 </script>"""
-
-
-INBOX = OUT / "inbox.jsonl"
 
 
 def listen(argv):
@@ -1188,7 +1327,12 @@ def view(argv):
     class V(BaseHTTPRequestHandler):
         def do_GET(self):
             u = urlparse(self.path)
-            if u.path == "/events":
+            if u.path == "/state":
+                said = OUT / "said.jsonl"
+                recent = [json.loads(x)["text"] for x in (said.read_text().splitlines()[-5:] if said.exists() else [])
+                          if json.loads(x)["t"] > time.time() - 20]  # lines can still echo a few seconds after they end
+                body, ctype = json.dumps({"speaking": (OUT / "speaking").exists(), "said": " ".join(recent)}).encode(), "application/json"
+            elif u.path == "/events":
                 since = int(parse_qs(u.query).get("since", ["0"])[0])
                 lines = log.read_text().splitlines() if log.exists() else []
                 body, ctype = ("[" + ",".join(lines[since:]) + "]").encode(), "application/json"
@@ -1205,6 +1349,10 @@ def view(argv):
             self.wfile.write(body)
 
         def do_POST(self):
+            if self.path.startswith("/hush"):
+                (OUT / "hush").touch()
+                self.send_response(204)
+                return self.end_headers()
             n = int(self.headers.get("Content-Length", 0))
             text = json.loads(self.rfile.read(n) or b"{}").get("text", "").strip()[:500]
             if text:
