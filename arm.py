@@ -419,7 +419,8 @@ class Voice:
                     continue
                 if gen != self.gen:  # interrupted while synthesising
                     continue
-                (OUT / "said.txt").write_text(text)  # the live view drops mic transcripts that echo this
+                with (OUT / "said.jsonl").open("a") as fh:  # the live view drops mic transcripts that echo these
+                    fh.write(json.dumps({"t": time.time(), "text": text}) + "\n")
                 (OUT / "speaking").touch()
                 self.proc = subprocess.Popen(cmd)
                 self.proc.wait()
@@ -1229,7 +1230,8 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\\bfrida
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,'').trim();
 let said='',hands=null;
 setInterval(async()=>{try{said=norm((await (await fetch('state')).json()).said)}catch(_){}},500);
-const echo=t=>{const w=norm(t);return w.length>3&&said.includes(w)};
+const echo=t=>{const w=norm(t).split(' ').filter(x=>x.length>2&&x!=='friday'),s=new Set(said.split(' '));
+  return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
 if(!SR)mic.disabled=true,mic.title='no speech recognition in this browser: type instead';
 else mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove('on');mic.textContent='Hands-free';return}
@@ -1284,9 +1286,10 @@ def view(argv):
         def do_GET(self):
             u = urlparse(self.path)
             if u.path == "/state":
-                said = OUT / "said.txt"
-                body, ctype = json.dumps({"speaking": (OUT / "speaking").exists(),
-                                          "said": said.read_text() if (OUT / "speaking").exists() and said.exists() else ""}).encode(), "application/json"
+                said = OUT / "said.jsonl"
+                recent = [json.loads(x)["text"] for x in (said.read_text().splitlines()[-5:] if said.exists() else [])
+                          if json.loads(x)["t"] > time.time() - 20]  # lines can still echo a few seconds after they end
+                body, ctype = json.dumps({"speaking": (OUT / "speaking").exists(), "said": " ".join(recent)}).encode(), "application/json"
             elif u.path == "/events":
                 since = int(parse_qs(u.query).get("since", ["0"])[0])
                 lines = log.read_text().splitlines() if log.exists() else []

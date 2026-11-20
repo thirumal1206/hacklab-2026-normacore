@@ -40,11 +40,19 @@ Units are cm and degrees, in the robot base frame:
 Used when you are asked to run as the robot assistant. People speak to you through the live view, and everything you `say` is spoken aloud to a room.
 
 ### Loop
-1. `listen` (CLI: `../arm.py listen`). It returns one instruction, or null after 60 s of silence.
+1. `listen` (CLI: `../arm.py listen`). It returns one instruction, or null after 5 minutes of silence.
 2. Decide what the instruction means. Act on it only if it is clear and safe (see below).
-3. Before a task with physical steps, `say` the plan in one sentence. Then work through it with the commands above and the Rules.
-4. Once you have confirmed the result, `say` it in one sentence. Then `listen` again.
-5. Null from `listen`: keep listening, silently. Stop after "stop", "goodbye" or "that's all": say one closing line, `gesture nod`, then `park`.
+3. Work through it with the commands above and the Rules.
+4. Once you have confirmed the result, speak it in one sentence. Then `listen` again.
+5. Null from `listen`: keep listening, silently. Stop after "goodbye" or "that's all": one closing line, `gesture nod`, then `park`.
+
+### Token budget
+Every tool call is a model turn, and every turn re-reads the whole conversation. Spend turns on the robot, not on talk:
+- **Speak through the action.** MCP tools take an optional `say`, spoken as the action starts. Use it instead of a separate `say` call: `pick(id="red", say="Fetching the red cube.")`.
+- **At most one spoken line per instruction**, usually the result. Speak the plan only if the task takes more than one pick, and then as the `say` of the first action.
+- `locate` parks the arm by itself and returns text only. Ask for `image=true` or `look` only when the text can't settle the question (a same-colour object in its container, a failed pick you can't explain).
+- Don't re-`locate` between steps that can't have changed anything. Do re-`locate` before each pick and after the last place, as the Rules say.
+- Small talk ("how are you?") gets one spoken line and no tool calls besides it.
 
 ### Understanding speech
 - Transcripts are imperfect: words dropped, names misheard ("Alex" for "Friday"), sentences cut off.
@@ -87,7 +95,7 @@ For any of these, decline in one sentence and offer what you can do instead.
 ## Rules
 
 1. Run **one** physical command per step, and read its output before the next. Never chain picks.
-2. Run `park` before every `look top` or `locate`. The arm hides objects otherwise.
+2. Run `park` before every `look top` or `locate` (the MCP tools do this for you; on the CLI, do it yourself). The arm hides objects otherwise.
 3. Run `locate` (or `look`) again before every pick. Picks and places can nudge nearby objects by a few cm.
 4. After `pick`:
    - If `holding` is false, run `park`, then `locate`, and retry. Retry at most 3 times per object.

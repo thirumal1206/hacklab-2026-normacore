@@ -15,7 +15,8 @@ NUM = {"type": "number"}
 TOOLS = {  # name: (description, {param: schema}, required)
     "look": ("Camera images; fixed cameras have a 5 cm grid labelled 'x,y' in cm. cams: top, front, wrist or all.",
              {"cams": {"type": "string", "default": "top"}}, []),
-    "locate": ("Objects seen by the top camera: id, x, y (cm), yaw, kind (object/container), inside. Returns the marks image.", {}, []),
+    "locate": ("Parks the arm, then lists objects seen by the top camera: id, x, y (cm), shape, kind, inside. Text only; image=true adds the "
+               "marks image (expensive: only when the text is not enough).", {"image": {"type": "boolean"}}, []),
     "pick": ("Pick an object: by id from the last locate, or at a rough x, y (cm) which snaps to the nearest object.",
              {"id": {"type": "string"}, "x": NUM, "y": NUM}, []),
     "place": ("Place what is held: at a container id, or at x, y (cm).", {"id": {"type": "string"}, "x": NUM, "y": NUM}, []),
@@ -54,12 +55,25 @@ def args_for(name, a):
     return []
 
 
+SLIM = ("id", "x", "y", "shape", "kind", "inside", "yaw_deg")
+
+
 def run_tool(name, a):
+    if a.get("say") and name != "say":  # speak and act in one tool call: one model turn instead of two
+        arm.call("say", [a["say"]])
     if name == "listen":  # local inbox, not the daemon
-        out = arm.listen(["--wait", str(a.get("wait_s", 60))])
+        out = arm.listen(["--wait", str(a.get("wait_s", 300))])
         return {"content": [{"type": "text", "text": json.dumps(out)}], "isError": False}
+    if name in ("locate", "look"):
+        arm.call("park")  # the arm hides objects; saves the model a separate park turn
     ok, txt = arm.call(name, args_for(name, a))
     out = json.loads(txt)
+    if name == "locate" and ok:  # every token here is re-read on every later turn: keep it small
+        out["objects"] = [{k: o[k] for k in SLIM if k in o} for o in out["objects"]]
+        img = out.pop("image")
+        txt = json.dumps(out)
+        if a.get("image"):
+            out["image"] = img
     paths = [out["image"]] if "image" in out else list(out.get("images", {}).values())
     content = [{"type": "text", "text": txt}]
     for p in paths:
@@ -75,7 +89,9 @@ def handle(msg):
                 "instructions": "Robot arm seen through cameras. Units: cm, robot base frame (x forward, y left, z up). "
                                 "One physical tool call at a time; park before locate; confirm results with locate or look."}
     if m == "tools/list":
-        return {"tools": [{"name": n, "description": d, "inputSchema": {"type": "object", "properties": props, "required": req}}
+        say = {"say": {"type": "string", "description": "Optional line to speak as this starts (saves a separate say call)."}}
+        return {"tools": [{"name": n, "description": d,
+                           "inputSchema": {"type": "object", "properties": props if n in ("say", "listen") else {**props, **say}, "required": req}}
                           for n, (d, props, req) in TOOLS.items()]}
     if m == "tools/call":
         if p["name"] not in TOOLS:
