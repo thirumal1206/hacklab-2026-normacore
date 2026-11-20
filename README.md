@@ -38,7 +38,7 @@ Open http://127.0.0.1:8766 in Chrome. It stays empty until the first command run
 
 **Tab 3: drive it yourself** to see how it works:
 ```bash
-.venv/bin/python arm.py locate          # lists objects; the marks image appears in the live view
+.venv/bin/python arm.py locate          # parks the arm, lists objects; the marks image appears in the live view
 .venv/bin/python arm.py pick red        # picks the object with id "red"
 .venv/bin/python arm.py place green-box # drops it in a free corner of the box
 .venv/bin/python arm.py score           # simulation only: which cubes are really in the box

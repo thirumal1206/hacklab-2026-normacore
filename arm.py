@@ -1142,7 +1142,7 @@ def serve(argv):
                     raise _Done
                 out = on_robot_thread(lambda: {
                     "look": lambda: arm.look(["top", "front", "wrist"] if not a or a[0] == "all" else a),
-                    "locate": lambda: arm.locate(),
+                    "locate": lambda: (arm.park(), arm.locate())[1],  # the arm hides objects unless parked
                     "snapshot": lambda: arm.snapshot(a or ["top"]),
                     "pick": lambda: arm.pick(*arm.target(a)),
                     "place": lambda: arm.place(*arm.drop_spot(a)),
