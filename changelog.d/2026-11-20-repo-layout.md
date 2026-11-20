@@ -1,0 +1,1 @@
+- **Repo layout.** Design and research docs moved to `docs/`, the obsolete Hugging Face plan to `docs/archive/`, the ArUco sheet to `venue/` (`selfcheck` and `calibrate-sheet` paths updated). Changelog entries now go in `changelog.d/`. `AGENTS.md` now holds the shared working, commit and PR rules for Claude Code and Codex. Checked: `make check` passes.

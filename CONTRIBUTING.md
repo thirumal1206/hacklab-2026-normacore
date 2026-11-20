@@ -23,7 +23,7 @@ make check
 
 ## Definition of done
 - `make check` passes, and the pre-commit hook passes (never `--no-verify`).
-- Behaviour changes are measured in sim (fixed seeds, `score`), and the numbers go into `CHANGELOG.md`. Anything not tried on hardware says "not verified".
+- Behaviour changes are measured in sim (fixed seeds, `score`), and the numbers go into a fragment in `changelog.d/` (see its README). Anything not tried on hardware says "not verified".
 - If a CLI command changes: `operator/AGENTS.md`, `mcp_server.py` and the `arm.py` docstring are updated together.
 - Safety limits (workspace, z floor, speed, calibrated ranges) are never loosened without a measured reason.
 
