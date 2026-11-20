@@ -1,0 +1,17 @@
+drivers:
+  st3215:
+    enabled: true
+    current-threshold: 100
+    deadband: 20
+  vesc-trampa:
+    enabled: false
+  system-info: false
+  usb-video:
+    enabled: true
+    resolution: 1280x720   # "auto" gave 640x480 on the Mac webcam; change if the camera lacks this mode
+    resize_target: 480
+    frame-skip: 0
+  hikmicro-thermal:
+    enabled: false
+  yahboom-dogzilla-lite:
+    enabled: false

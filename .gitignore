@@ -1,0 +1,26 @@
+# environments and caches
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# large or generated: training outputs, datasets, run images, logs
+outputs/
+outputs_*.log
+datasets/
+runs/
+*.gif
+frame_*.png
+calib.json
+
+# third-party checkouts and installs (clone them yourself; see VENUE.md)
+lerobot/
+tools/
+venue/bin/
+rust/target/
+
+# obsolete Hugging Face/LeRobot experiments
+eval_policy.py
+record_dataset.py
+reqs*.lock
+watch_mem.sh
