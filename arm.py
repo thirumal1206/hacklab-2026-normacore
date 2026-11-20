@@ -701,6 +701,20 @@ class Arm:
         self.grip("open")
         return {**self.move(x, y, self.b.prof["hover"] * 100), "dropped_on_the_way": dropped}
 
+    def drop_spot(self, a):
+        """`place <container id>`: a free corner of the box, not its centre (stacked objects stick out); else target()."""
+        import numpy as np
+
+        if len(a) == 1 and self.marks.get(a[0], {}).get("kind") == "container":
+            c = self.marks[a[0]]
+            half = max(1.0, min(c["size_cm"]) / 2 - 2.5)  # 2.5 cm in from the walls
+            used = [(o["x"], o["y"]) for o in self.marks.values() if o.get("inside") == a[0]] + getattr(self, "dropped", [])
+            spots = [(c["x"] + dx * half, c["y"] + dy * half) for dx, dy in ((1, 1), (-1, -1), (1, -1), (-1, 1), (0, 0))]
+            x, y = max(spots, key=lambda p: min([np.hypot(p[0] - u[0], p[1] - u[1]) for u in used] or [99]))
+            self.dropped = getattr(self, "dropped", [])[-3:] + [(x, y)]  # placed since the last locate
+            return x, y
+        return self.target(a)[:2]
+
     def target(self, a):
         """`pick 3` / `place 1` use mark ids from the last locate; otherwise X Y [--yaw D] in cm."""
         if len(a) == 1 or (len(a) > 1 and a[1].startswith("--")):
@@ -919,7 +933,7 @@ class Arm:
         # Set-of-Mark: number every blob on the image so the agent chooses an id instead of regressing coordinates.
         img = cv2.cvtColor(self.b.image(cam), cv2.COLOR_RGB2BGR)
         H = np.linalg.inv(Hinv)
-        self.marks = {}
+        self.marks, self.dropped = {}, []
         taken = []  # label rects already drawn
         for o in sorted(found, key=lambda o: (o["color"], o["x"])):
             base = o["color"] + ("-box" if o["kind"] == "container" else "")
@@ -997,7 +1011,7 @@ def serve(argv):
                     "locate": lambda: arm.locate(),
                     "snapshot": lambda: arm.snapshot(a or ["top"]),
                     "pick": lambda: arm.pick(*arm.target(a)),
-                    "place": lambda: arm.place(*arm.target(a)[:2]),
+                    "place": lambda: arm.place(*arm.drop_spot(a)),
                     "move": lambda: arm.move(f(0), f(1), f(2), yaw),
                     "grip": lambda: arm.grip(a[0]),
                     "park": arm.park,

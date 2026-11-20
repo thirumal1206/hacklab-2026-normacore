@@ -26,8 +26,9 @@ Everything below is untested on real hardware. Record what you see in `CHANGELOG
    - ElRobot: joint angles come from mapping the calibrated range onto the URDF limits (as NormaCore's viewer does). Not verified.
 5. **Calibrate the top camera** (fixed, looking down): lay the 4 markers flat and spread out, `arm.py calibrate top`, then for each marker `arm.py move X Y 1` onto its centre and `arm.py calib-mark ID`. Reprojection error must be under 5 px.
 6. **Smoke test:** one object, `arm.py locate`, `arm.py pick ID`, `arm.py place X Y`. Then 10 timed trials.
-7. **Operator:** start Claude Code (or Codex) inside `operator/`; it reads `AGENTS.md`. Claude Code also offers the `arm` MCP server from `operator/.mcp.json` on first start: approve it, and images arrive inline in the tool results (the CLI still works without it). Always confirm results with `locate` or `look top`: operators over-claim from images.
-8. **Live view for the judges:** `arm.py view` in another terminal, open http://127.0.0.1:8766 (ARM_PORT+1) on a big screen. It shows the latest image and every command, with the operator's `say` lines highlighted. It updates after each command finishes, not during a move.
+7. **Operator model:** Friday (voice assistant) runs well on Haiku: `claude --model haiku` in `operator/` (about 10x cheaper per command than Sonnet, see CHANGELOG). For long autonomous tasks, Sonnet follows the finer rules more closely.
+8. **Operator:** start Claude Code (or Codex) inside `operator/`; it reads `AGENTS.md`. Claude Code also offers the `arm` MCP server from `operator/.mcp.json` on first start: approve it, and images arrive inline in the tool results (the CLI still works without it). Always confirm results with `locate` or `look top`: operators over-claim from images.
+9. **Live view for the judges:** `arm.py view` in another terminal, open http://127.0.0.1:8766 (ARM_PORT+1) on a big screen. It shows the latest image and every command, with the operator's `say` lines highlighted. It updates after each command finishes, not during a move.
 
 ## Fallback: taught grid (if IK or calibration is off)
 June's winner did this. It needs no kinematic model and no `calib-mark`.
