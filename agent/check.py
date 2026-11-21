@@ -90,5 +90,9 @@ check("mcp: 6 tools listed", len(replies[1]["result"]["tools"]) == 6)
 check("mcp: scan returns packs", len(json.loads(replies[2]["result"]["content"][0]["text"])["packs"]) == 8)
 check("mcp: inspect returns an image", replies[3]["result"]["content"][1]["type"] == "image")
 
+import dashboard  # noqa: E402
+
+st = dashboard.state()
+check("dashboard state: current session, scan and events", st["session"] and st["scan"]["packs"] and st["events"])
 print("AGENT CHECK OK" if ok else "AGENT CHECK FAILED")
 sys.exit(0 if ok else 1)

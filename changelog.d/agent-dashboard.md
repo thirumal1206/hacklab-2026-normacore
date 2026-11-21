@@ -1,0 +1,1 @@
+- `agent/dashboard.py`: live sorter page on 127.0.0.1:8770 from `runs/agent/proof.jsonl` and `scan.json`: tiles per bin, vetoes and progress, pack table with Claude's bin, reason and status, live log with label crops and highlighted vetoes, STOP/RESUME button (writes `runs/agent/STOP`). Checked on a Haiku fake batch (8/8 shown verified) and the STOP button in a browser.
