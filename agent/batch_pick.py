@@ -2,9 +2,14 @@
 no home in between. Positions are taken once (from one camera frame) and given on the command line.
 
     .venv/bin/python agent/batch_pick.py bin1 X,Y[,ANGLE] X,Y[,ANGLE] ...  [--go]      (cm, deg; default dry)
-    .venv/bin/python agent/batch_pick.py bin1 --vision [--go]     positions from one top-camera frame (no Claude)
+    .venv/bin/python agent/batch_pick.py bin1 --vision [--go]     positions from live vision (no Claude)
 
---vision: Ash's outline detector (vision_targets.detect_outlines, unchanged) on the paper sheet, mapped to robot cm with our
+--vision with live_vision.py running (runs/agent/world.json fresh): live mode. The next object is chosen each round while
+the arm is at the bin or home (not over the table), its latest position is re-read right before the hover move, and a
+spot is tried at most twice (a miss stays visible and is retried once). When the table looks empty the arm goes home
+and looks again (objects under the arm are hidden), then finishes.
+
+--vision without live vision: one frame, Ash's outline detector (vision_targets.detect_outlines, unchanged) on the paper sheet, mapped to robot cm with our
 robot_homography.json (fitted on robot-touched crosses), minAreaRect per object, jaw closing angle = long axis + 90.
 Objects wider than the jaws, tiny marks, the arc line and anything out of reach are skipped. Order: nearest to the bin first. The marked frame is saved to
 runs/agent/vision_batch.jpg. With --go the arm goes home first so it is out of the photo.
@@ -41,6 +46,11 @@ MIN_WIDTH_CM = 1.5  # thinner: a piece of the drawn arc line
 # ADJUST per object height: the mapping is fitted on the table, a candy top is ~2 cm higher and the camera looks at it
 # from the +x side, so it appears closer to the base. Measured 22.11 with the wrist camera on 3 candies: x -1.3..-1.5 cm.
 VISION_OFFSET_CM = (1.4, 0.1)
+LIVE_WAIT_S = 1.2  # after home: arm out of the view, the tracker needs 3 frames (0.6 s at 5 Hz) to confirm
+SAME_SPOT_CM = 2.0  # an object this close to an earlier attempt is the same one (a miss)
+TRIES_PER_SPOT = 2
+MAX_PICKS = 20
+MAX_REPLANS = 10  # target gone or moved between choosing and moving, in a row: give up
 
 
 def vision_targets(drop):
@@ -89,6 +99,150 @@ def vision_targets(drop):
     return keep
 
 
+class Picker:
+    """One pick-and-place per call: hover (jaws opening on the way), down, close, up, bin drop, open."""
+
+    def __init__(self, bin_name, ctl):
+        self.bin_name, self.ctl = bin_name, ctl
+        m, self.f, self.d = real.free_settings()
+        self.g = m["grasp"]
+        self.zg = self.d["table_z_m"] + self.f["grip_z_above_table_cm"] / 100
+        self.hover = self.zg + self.f["hover_above_grip_cm"] / 100
+        self.none = (0, range(0))  # no joint-jump guard: fast mode
+        self.times = []
+
+    def bin(self):
+        return self.ctl.bin if self.ctl else self.bin_name  # "bin 3" said before the drop still counts
+
+    def rpy(self, angle):
+        return self.d["grip"]["roll"], self.d["grip"]["pitch"], real.jaw_yaw(angle, self.f)
+
+    def step(self, label, fn, *a, **k):  # run one command (after the voice check) and note how long it took
+        while True:
+            voice_ctl.check(self.ctl)
+            s = time.monotonic()
+            try:
+                out = fn(*a, **k)
+                break
+            except real.Stopped:  # STOP came between the check and the command: pause there, then retry
+                if self.ctl is None:
+                    raise
+        self.times.append(f"{label} {time.monotonic() - s:.1f}")
+        return out
+
+    def solvable(self, x_cm, y_cm, angle):
+        """IK for hover and grip height, no motion. Raises real.Refused if out of reach."""
+        for z in (self.hover, self.zg):
+            while True:
+                voice_ctl.check(self.ctl)
+                try:
+                    real.free_move(x_cm / 100, y_cm / 100, z, self.rpy(angle), "check", None, *self.none, execute=False)
+                    break
+                except real.Stopped:  # paused by voice during the check: wait, then solve again
+                    if self.ctl is None:
+                        raise
+
+    def pick(self, x_cm, y_cm, angle):
+        """Returns the bin used. On voice abort a held object is put back where it was, then Aborted is raised."""
+        self.times = []
+        x, y, g, none = x_cm / 100, y_cm / 100, self.g, self.none
+        rpy = self.rpy(angle)
+        at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, self.zg, *rpy)))
+        held = False
+        try:
+            if not real.DRY:
+                real.set_jaw(g["open"])  # no separate open command: the hover move carries gripper = open
+            self.step("hover", real.free_move, x, y, self.hover, rpy, "hover", None, *none)
+            self.step("down", real.free_move, x, y, self.zg, rpy, "down", None, *none)
+            self.step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
+            held = True
+            self.step("up", real.free_move, x, y, self.hover, rpy, "up", None, *none, loaded=True)
+            bin_now = self.bin()
+            drop = real.bin_pose(bin_now)["drop"]
+            self.step("bin", real.move, drop, f"{bin_now} drop", loaded=True)
+            self.step("open", real.grip, g["open"], at=drop)
+            return bin_now
+        except voice_ctl.Aborted:
+            real.STOP.unlink(missing_ok=True)
+            if held:  # put it back where it was picked, from straight above
+                real.free_move(x, y, self.hover, rpy, "abort hover", None, *none, loaded=True)
+                real.free_move(x, y, self.zg, rpy, "abort down", None, *none, loaded=True)
+                real.grip(g["open"], at=at)
+                real.free_move(x, y, self.hover, rpy, "abort up", None, *none)
+            voice_ctl.say("Aborted." + (" Put it back." if held else ""))
+            raise
+
+
+def live(p, go):
+    """Pick from live_vision's world.json until the table is empty (see the module doc)."""
+    import live_vision
+    if go:
+        real.home()
+        time.sleep(LIVE_WAIT_S)
+    t0, tries, skipped, picks, misses, replans, at_home, found = time.monotonic(), [], [], 0, 0, 0, True, None
+
+    def tried(o, spots=None):
+        return sum(math.hypot(o["x_cm"] - x, o["y_cm"] - y) < SAME_SPOT_CM for x, y in (tries if spots is None else spots))
+
+    def world():
+        w = live_vision.world()
+        if w is None:
+            raise RuntimeError("live vision stopped: runs/agent/world.json is stale")
+        return [o for o in w if o["pickable"]]
+
+    try:
+        while picks < MAX_PICKS and replans < MAX_REPLANS:
+            voice_ctl.check(p.ctl)
+            drop = real.bin_pose(p.bin())["drop"]
+            todo = sorted((o for o in world() if tried(o) < (1 if real.DRY else TRIES_PER_SPOT) and not tried(o, skipped)),
+                          key=lambda o: math.hypot(o["x_cm"] - drop["x"] * 100, o["y_cm"] - drop["y"] * 100))
+            if found is None:
+                found = len(todo)
+                if p.ctl:
+                    voice_ctl.say(f"I see {found} to pick, into bin {p.bin()[3:]}." if found else "I see nothing I can pick.")
+            if not todo:
+                if at_home:
+                    break
+                p.step("home", real.home)  # something may hide under the arm: look again from home
+                at_home = True
+                if go:
+                    time.sleep(LIVE_WAIT_S)
+                continue
+            o = todo[0]
+            try:
+                p.solvable(o["x_cm"], o["y_cm"], o["jaw_deg"])
+            except real.Refused as e:
+                print(f"  skip #{o['id']} ({o['x_cm']:.1f}, {o['y_cm']:.1f}) cm: {e}")
+                skipped.append((o["x_cm"], o["y_cm"]))  # not a miss: never tried
+                continue
+            now = next((n for n in world() if n["id"] == o["id"]), None)  # re-check right before moving over it
+            if now is None or math.hypot(now["x_cm"] - o["x_cm"], now["y_cm"] - o["y_cm"]) > SAME_SPOT_CM:
+                replans += 1
+                print(f"  #{o['id']} {'gone' if now is None else 'moved'}: choosing again")
+                continue
+            replans = 0
+            if tried(now):
+                misses += 1
+                print(f"  #{now['id']} still there after a pick: retrying once")
+            tries.append((now["x_cm"], now["y_cm"]))
+            t = time.monotonic()
+            bin_used = p.pick(now["x_cm"], now["y_cm"], now["jaw_deg"])
+            picks, at_home = picks + 1, False
+            print(f"{picks}. #{now['id']} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {now['jaw_deg']:.0f} -> {bin_used}  "
+                  f"{time.monotonic() - t:.1f} s   [{', '.join(p.times)}]", flush=True)
+            if p.ctl and p.ctl.cancel:
+                break
+    except voice_ctl.Aborted:
+        pass  # pick() already put a held object back and said so
+    real.home()
+    if go and picks:  # objects still lying at a tried spot were missed
+        time.sleep(LIVE_WAIT_S)
+        misses += sum(tried(o) >= 1 for o in (live_vision.world() or []) if o["pickable"])
+    done = picks - misses
+    print(f"done: {done} of {found or 0} ({picks} picks, {misses} missed) in {time.monotonic() - t0:.1f} s")
+    return {"done": done, "found": found or 0, "seconds": round(time.monotonic() - t0, 1), "bin": p.bin()}
+
+
 def main(argv, ctl=None):
     """ctl: a voice_ctl.Control (voice_batch.py passes one); None = no voice control."""
     go, vision = "--go" in argv, "--vision" in argv
@@ -98,94 +252,48 @@ def main(argv, ctl=None):
     if not go:
         real.DRY = True
     bin_name = args[0]
+    p = Picker(bin_name, ctl)
     if vision:
+        import live_vision
+        if live_vision.world() is not None:
+            print(f"live vision: picking into {bin_name}{'' if go else ' (dry run)'}")
+            return live(p, go)
+        print("live vision not running: one frame with Ash's detector")
         if go:
             real.home()  # out of the photo
         targets = vision_targets(real.bin_pose(bin_name)["drop"])
-    else:
-        targets = [parse(a) for a in args[1:]]
-    m, f, d = real.free_settings()
-    g = m["grasp"]
-    zg = d["table_z_m"] + f["grip_z_above_table_cm"] / 100
-    hover = zg + f["hover_above_grip_cm"] / 100
-    drop = real.bin_pose(bin_name)["drop"]
-    none = (0, range(0))  # no joint-jump guard: fast mode
-    if vision:  # solve every target first (no motion); an unreachable one is skipped instead of stopping the batch
-        ok = []
+        ok = []  # solve every target first (no motion); an unreachable one is skipped instead of stopping the batch
         for x_cm, y_cm, angle in targets:
-            rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(angle, f))
             try:
-                for z in (hover, zg):
-                    while True:
-                        voice_ctl.check(ctl)
-                        try:
-                            real.free_move(x_cm / 100, y_cm / 100, z, rpy, "check", None, *none, execute=False)
-                            break
-                        except real.Stopped:  # paused by voice during the check: wait, then solve again
-                            if ctl is None:
-                                raise
+                p.solvable(x_cm, y_cm, angle)
                 ok.append((x_cm, y_cm, angle))
             except real.Refused as e:
                 print(f"  skip ({x_cm:.1f}, {y_cm:.1f}) cm: {e}")
             except voice_ctl.Aborted:
                 voice_ctl.say("Aborted.")
-                return {"done": 0, "found": len(targets), "seconds": 0, "bin": ctl.bin}
+                return {"done": 0, "found": len(targets), "seconds": 0, "bin": p.bin()}
         targets = ok
         if ctl:
             voice_ctl.say(f"Picking {len(targets)} candies into bin {bin_name[3:]}." if targets else "I see nothing I can pick.")
         print(f"{len(targets)} reachable, picking into {bin_name}{'' if go else ' (dry run)'}")
+    else:
+        targets = [parse(a) for a in args[1:]]
     t0, done = time.monotonic(), 0
     for i, (x_cm, y_cm, angle) in enumerate(targets, 1):
-        t, times = time.monotonic(), []
-
-        def step(label, fn, *a, **k):  # run one command (after the voice check) and note how long it took
-            while True:
-                voice_ctl.check(ctl)
-                s = time.monotonic()
-                try:
-                    out = fn(*a, **k)
-                    break
-                except real.Stopped:  # STOP came between the check and the command: pause there, then retry
-                    if ctl is None:
-                        raise
-            times.append(f"{label} {time.monotonic() - s:.1f}")
-            return out
-
-        x, y = x_cm / 100, y_cm / 100
-        rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(angle, f))
-        at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, zg, *rpy)))
-        held = False
+        t = time.monotonic()
         try:
-            if not real.DRY:
-                real.set_jaw(g["open"])  # no separate open command: the hover move carries gripper = open
-            step("hover", real.free_move, x, y, hover, rpy, "hover", None, *none)
-            step("down", real.free_move, x, y, zg, rpy, "down", None, *none)
-            step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
-            held = True
-            step("up", real.free_move, x, y, hover, rpy, "up", None, *none, loaded=True)
-            bin_now = ctl.bin if ctl else bin_name  # "bin 3" said before here still counts for this candy
-            drop = real.bin_pose(bin_now)["drop"]
-            step("bin", real.move, drop, f"{bin_now} drop", loaded=True)
-            step("open", real.grip, g["open"], at=drop)
-            held = False
+            bin_now = p.pick(x_cm, y_cm, angle)
         except voice_ctl.Aborted:
-            real.STOP.unlink(missing_ok=True)
-            if held:  # put it back where it was picked, from straight above
-                real.free_move(x, y, hover, rpy, "abort hover", None, *none, loaded=True)
-                real.free_move(x, y, zg, rpy, "abort down", None, *none, loaded=True)
-                real.grip(g["open"], at=at)
-                real.free_move(x, y, hover, rpy, "abort up", None, *none)
-            voice_ctl.say("Aborted." + (" Put the candy back." if held else ""))
             break
         done += 1
         print(f"{i}/{len(targets)} ({x_cm:.1f}, {y_cm:.1f}) cm -> {bin_now}  {time.monotonic() - t:.1f} s   "
-              f"[{', '.join(times)}]", flush=True)
+              f"[{', '.join(p.times)}]", flush=True)
         if ctl and ctl.cancel:
             break
     real.home()
     print(f"done: {done} of {len(targets)} objects in {time.monotonic() - t0:.1f} s")
-    return {"done": done, "found": len(targets), "seconds": round(time.monotonic() - t0, 1),
-            "bin": ctl.bin if ctl else bin_name}
+    return {"done": done, "found": len(targets), "seconds": round(time.monotonic() - t0, 1), "bin": p.bin()}
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

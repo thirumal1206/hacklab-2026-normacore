@@ -9,7 +9,7 @@ Looks only:      "what do you see", "how many candies", "look"
 Arm:             "go home", "open your claws", "close your claws"
 During a run:    "stop" / "continue", "bin 3", "cancel", "abort"   (see voice_ctl.py)
 Ends:            "goodbye"
-Vision and motion are batch_pick.py --vision: one camera frame, Ash's detector, our robot homography.
+Vision and motion are batch_pick.py --vision: live_vision.py positions if it runs, else one frame with Ash's detector.
 """
 import re
 import sys
@@ -58,7 +58,10 @@ def main(argv):
                     real.grip(real.cfg("motion.json")["grasp"]["close"])
                     voice_ctl.say("Closed.")
                 elif re.search(LOOK, t) and not re.search(r"\b(pick|sort|put)\b", t):
-                    found = batch_pick.vision_targets(real.bin_pose(b or last_bin)["drop"])
+                    import live_vision
+                    w = live_vision.world()
+                    found = ([o for o in w if o["pickable"]] if w is not None
+                             else batch_pick.vision_targets(real.bin_pose(b or last_bin)["drop"]))
                     voice_ctl.say(f"I see {len(found)} candies I can pick." if found else "I see nothing I can pick.")
                 elif re.search(START, t) or b:
                     last_bin = b or last_bin
