@@ -4,7 +4,24 @@
   "follower_bus": "5B79016927",
   "poses": {
     "_help": "Taught pose: x, y, z (m), roll, pitch, yaw (rad), steps (motor 1-8). Written by agent/teach.py, never typed by hand.",
-    "home": null,
+    "home": {
+      "x": 0.1417,
+      "y": 0.0019,
+      "z": 0.2678,
+      "roll": -1.3753,
+      "pitch": -1.2618,
+      "yaw": -0.1625,
+      "steps": [
+        2118,
+        1608,
+        1667,
+        2231,
+        1899,
+        2761,
+        3166,
+        1285
+      ]
+    },
     "slots": [
       {
         "name": "slot1",
@@ -27,24 +44,109 @@
     ],
     "bins": [
       {
-        "name": "Painkillers",
-        "hover": null,
-        "drop": null
+        "name": "bin1",
+        "drop": {
+          "x": 0.0338,
+          "y": 0.2076,
+          "z": 0.1252,
+          "roll": -1.5326,
+          "pitch": -0.3903,
+          "yaw": 1.3117,
+          "steps": [
+            2929,
+            2132,
+            1657,
+            2138,
+            1855,
+            2911,
+            3166,
+            1956
+          ]
+        }
       },
       {
-        "name": "Allergy",
-        "hover": null,
-        "drop": null
+        "name": "bin2",
+        "drop": {
+          "x": 0.1356,
+          "y": 0.1665,
+          "z": 0.1166,
+          "roll": -1.4597,
+          "pitch": -0.3436,
+          "yaw": 0.733,
+          "steps": [
+            2571,
+            2176,
+            1658,
+            2121,
+            1806,
+            2912,
+            3167,
+            1693
+          ]
+        }
       },
       {
-        "name": "Vitamins",
-        "hover": null,
-        "drop": null
+        "name": "bin3",
+        "drop": {
+          "x": 0.2284,
+          "y": 0.032,
+          "z": 0.111,
+          "roll": -1.5887,
+          "pitch": -0.3353,
+          "yaw": 0.0836,
+          "steps": [
+            2166,
+            2280,
+            1641,
+            2021,
+            1891,
+            2939,
+            3167,
+            1693
+          ]
+        }
       },
       {
-        "name": "Unknown",
-        "hover": null,
-        "drop": null
+        "name": "bin4",
+        "drop": {
+          "x": 0.2048,
+          "y": -0.1196,
+          "z": 0.117,
+          "roll": -1.4724,
+          "pitch": -0.3637,
+          "yaw": -0.6607,
+          "steps": [
+            1708,
+            2298,
+            1621,
+            1997,
+            1822,
+            2939,
+            3167,
+            1693
+          ]
+        }
+      },
+      {
+        "name": "bin5",
+        "drop": {
+          "x": 0.0513,
+          "y": -0.2068,
+          "z": 0.1188,
+          "roll": -1.5111,
+          "pitch": -0.2695,
+          "yaw": -1.4324,
+          "steps": [
+            1226,
+            2275,
+            1560,
+            2059,
+            1845,
+            3024,
+            3167,
+            1693
+          ]
+        }
       }
     ]
   },
@@ -54,16 +156,18 @@
     "close": 0.0,
     "empty_below": 0.05,
     "settle_s": 1.5,
-    "retries": 1
+    "retries": 1,
+    "relief": 0.04,
+    "_relief_help": "after the close stalls on a pack, the gripper goal is set this far (0..1 opening) inside the measured opening: moderate squeeze instead of a hard stall"
   },
   "speed": {
     "empty": {
-      "speed": 150,
-      "accel": 10
+      "speed": 1500,
+      "accel": 100
     },
     "loaded": {
-      "speed": 120,
-      "accel": 10
+      "speed": 1500,
+      "accel": 100
     }
   },
   "measured": {
@@ -76,8 +180,9 @@
   },
   "ik_url": "http://127.0.0.1:8020",
   "safety": {
-    "_help": "Refuse a move if the IK solution differs from the taught motor steps by more than this on any joint (a flipped elbow).",
-    "max_step_diff": 150
+    "_help": "fast true: every move is one execute request; only the IK API's own checks (reach, joint limits, table/self collision incl. along the path, stale data) and the STOP file apply. fast false: also solve first, flip guards, reach probes.",
+    "max_step_diff": 150,
+    "fast": true
   },
   "sequences": {
     "_help": "Step order, played by agent/real.py. Steps: home, slot.<pose>, bin.<pose>, open, close, photo, wait:<seconds>. Any <pose> name you use here becomes a pose to teach (agent/teach.py slot1 <pose>). Moves after close and before open run at the loaded speed.",
@@ -89,10 +194,8 @@
       "slot.hover"
     ],
     "place": [
-      "bin.hover",
       "bin.drop",
-      "open",
-      "bin.hover"
+      "open"
     ],
     "read": [
       "slot.hover",
@@ -101,5 +204,15 @@
       "photo",
       "slot.hover"
     ]
+  },
+  "pick_mode": "free",
+  "free_pick": {
+    "_help": "Free pick (pick_mode free): grab height = table + grip_z_above_table_cm (number, or per height class), hover that much higher (lower if it does not solve far out), jaws turned to the pack angle + yaw_offset_deg. Joint jump limits in motor steps: travel = motors 2-6 on the way to the hover, vertical = motors 1-6 going down/up.",
+    "points_file": "agent/config/robot_points.json",
+    "grip_z_above_table_cm": 0.5,
+    "hover_above_grip_cm": 5.0,
+    "yaw_offset_deg": 0.0,
+    "max_travel_step_diff": 1500,
+    "max_vertical_step_diff": 300
   }
 }

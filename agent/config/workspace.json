@@ -78,11 +78,11 @@
   },
   "calibration": {
     "_help": "Pixel -> table homography from touch points. Fit at box-top height if packs are tall.",
-    "homography_file": "venue/elrobot/ik-calib/calib/overview_homography.json",
-    "fitted_at_z_cm": null,
-    "rms_mm": null,
-    "max_mm": null,
-    "points_used": null
+    "homography_file": "agent/config/robot_homography.json",
+    "fitted_at_z_cm": 0.0,
+    "rms_mm": 5.0,
+    "max_mm": 12.2,
+    "points_used": 9
   },
   "bump_markers": {
     "_help": "Fixed markers (e.g. corner crosses). Their pixel positions at calibration time; if one moves more than tolerance_px, every tool stops with 'recalibrate'.",

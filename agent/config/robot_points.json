@@ -1,0 +1,411 @@
+{
+  "_owner": "Motion",
+  "_help": "Points recorded by agent/record_points.py from the follower while it mirrors the leader. Never typed by hand. Units: m and rad, IK API frame (origin on the base axis, x forward, y left, z up).",
+  "cross_pixels_csv": "agent/config/cross_pixels.csv",
+  "cross_camera_id": null,
+  "cross_image_size": [
+    1280,
+    960
+  ],
+  "points": [
+    {
+      "name": "home",
+      "how": "safe start pose, arm out of the top camera's view",
+      "pose": {
+        "x": 0.1417,
+        "y": 0.0019,
+        "z": 0.2678,
+        "roll": -1.3753,
+        "pitch": -1.2618,
+        "yaw": -0.1625,
+        "steps": [
+          2118,
+          1608,
+          1667,
+          2231,
+          1899,
+          2761,
+          3166,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:46:26"
+      }
+    },
+    {
+      "name": "cross_1",
+      "how": "jaws CLOSED, tips touching the centre of cross 1, gripper pointing straight down",
+      "pose": {
+        "x": 0.1194,
+        "y": -0.1507,
+        "z": 0.0137,
+        "roll": -1.6692,
+        "pitch": -0.1432,
+        "yaw": -0.8328,
+        "steps": [
+          1549,
+          2124,
+          2014,
+          2250,
+          1939,
+          2613,
+          3164,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:47:21"
+      }
+    },
+    {
+      "name": "cross_2",
+      "how": "jaws closed, tips on the centre of cross 2, pointing down",
+      "pose": {
+        "x": 0.1864,
+        "y": -0.0729,
+        "z": 0.0122,
+        "roll": -1.6002,
+        "pitch": -0.1226,
+        "yaw": -0.4035,
+        "steps": [
+          1842,
+          2160,
+          2077,
+          2114,
+          1886,
+          2662,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:48:19"
+      }
+    },
+    {
+      "name": "cross_3",
+      "how": "jaws closed, tips on the centre of cross 3, pointing down",
+      "pose": {
+        "x": 0.2047,
+        "y": 0.0696,
+        "z": 0.014,
+        "roll": -1.6136,
+        "pitch": -0.0683,
+        "yaw": 0.2912,
+        "steps": [
+          2279,
+          2320,
+          1936,
+          2040,
+          1887,
+          2755,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:49:04"
+      }
+    },
+    {
+      "name": "cross_4",
+      "how": "jaws closed, tips on the centre of cross 4, pointing down",
+      "pose": {
+        "x": 0.1707,
+        "y": 0.1154,
+        "z": 0.0047,
+        "roll": -1.6258,
+        "pitch": -0.0447,
+        "yaw": 0.5682,
+        "steps": [
+          2449,
+          2244,
+          2134,
+          1935,
+          1892,
+          2751,
+          3164,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:50:30"
+      }
+    },
+    {
+      "name": "cross_5",
+      "how": "jaws closed, tips on the centre of cross 5, pointing down",
+      "pose": {
+        "x": 0.0529,
+        "y": -0.1749,
+        "z": 0.0093,
+        "roll": -1.5859,
+        "pitch": -0.0884,
+        "yaw": -1.3267,
+        "steps": [
+          1275,
+          1994,
+          2455,
+          1824,
+          1876,
+          2755,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:51:14"
+      }
+    },
+    {
+      "name": "cross_6",
+      "how": "jaws closed, tips on the centre of cross 6, pointing down",
+      "pose": {
+        "x": 0.103,
+        "y": -0.0371,
+        "z": 0.0052,
+        "roll": -1.5753,
+        "pitch": -0.0205,
+        "yaw": -0.4035,
+        "steps": [
+          1845,
+          1767,
+          2188,
+          2478,
+          1866,
+          2649,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:51:48"
+      }
+    },
+    {
+      "name": "cross_7",
+      "how": "jaws closed, tips on the centre of cross 7, pointing down",
+      "pose": {
+        "x": 0.1174,
+        "y": 0.1256,
+        "z": 0.005,
+        "roll": -1.5843,
+        "pitch": 0.0102,
+        "yaw": 0.754,
+        "steps": [
+          2567,
+          2321,
+          1555,
+          2584,
+          1865,
+          2645,
+          3166,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:52:25"
+      }
+    },
+    {
+      "name": "cross_8",
+      "how": "jaws closed, tips on the centre of cross 8, pointing down",
+      "pose": {
+        "x": 0.0447,
+        "y": -0.1072,
+        "z": 0.008,
+        "roll": -1.5737,
+        "pitch": 0.029,
+        "yaw": -1.2344,
+        "steps": [
+          1329,
+          1918,
+          1988,
+          2559,
+          1867,
+          2648,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:53:03"
+      }
+    },
+    {
+      "name": "cross_9",
+      "how": "jaws closed, tips on the centre of cross 9, pointing down",
+      "pose": {
+        "x": 0.0618,
+        "y": 0.0847,
+        "z": 0.0072,
+        "roll": -1.5955,
+        "pitch": 0.0903,
+        "yaw": 0.8931,
+        "steps": [
+          2649,
+          2004,
+          1780,
+          2725,
+          1870,
+          2649,
+          3165,
+          1285
+        ],
+        "gripper": 0.035,
+        "time": "2026-11-21 18:53:39"
+      }
+    },
+    {
+      "name": "grip_ref",
+      "how": "a real pack in the middle of the table: jaws closed AROUND it exactly as a pick should hold it",
+      "pose": {
+        "x": 0.1248,
+        "y": -0.0436,
+        "z": 0.0079,
+        "roll": -1.5366,
+        "pitch": -0.0946,
+        "yaw": -0.4509,
+        "steps": [
+          1825,
+          1589,
+          2767,
+          1852,
+          1840,
+          2817,
+          3166,
+          1966
+        ],
+        "gripper": 0.45,
+        "time": "2026-11-21 18:55:10"
+      }
+    },
+    {
+      "name": "bin1",
+      "how": "centre of bin 1, pointing down, jaw tips 2-4 cm above the rim (release here)",
+      "pose": {
+        "x": 0.0338,
+        "y": 0.2076,
+        "z": 0.1252,
+        "roll": -1.5326,
+        "pitch": -0.3903,
+        "yaw": 1.3117,
+        "steps": [
+          2929,
+          2132,
+          1657,
+          2138,
+          1855,
+          2911,
+          3166,
+          1956
+        ],
+        "gripper": 0.444,
+        "time": "2026-11-21 18:56:11"
+      }
+    },
+    {
+      "name": "bin2",
+      "how": "centre of bin 2, pointing down, jaw tips 2-4 cm above the rim",
+      "pose": {
+        "x": 0.1356,
+        "y": 0.1665,
+        "z": 0.1166,
+        "roll": -1.4597,
+        "pitch": -0.3436,
+        "yaw": 0.733,
+        "steps": [
+          2571,
+          2176,
+          1658,
+          2121,
+          1806,
+          2912,
+          3167,
+          1693
+        ],
+        "gripper": 0.284,
+        "time": "2026-11-21 18:57:31"
+      }
+    },
+    {
+      "name": "bin3",
+      "how": "centre of bin 3, pointing down, jaw tips 2-4 cm above the rim",
+      "pose": {
+        "x": 0.2284,
+        "y": 0.032,
+        "z": 0.111,
+        "roll": -1.5887,
+        "pitch": -0.3353,
+        "yaw": 0.0836,
+        "steps": [
+          2166,
+          2280,
+          1641,
+          2021,
+          1891,
+          2939,
+          3167,
+          1693
+        ],
+        "gripper": 0.284,
+        "time": "2026-11-21 18:58:15"
+      }
+    },
+    {
+      "name": "bin4",
+      "how": "centre of bin 4, pointing down, jaw tips 2-4 cm above the rim",
+      "pose": {
+        "x": 0.2048,
+        "y": -0.1196,
+        "z": 0.117,
+        "roll": -1.4724,
+        "pitch": -0.3637,
+        "yaw": -0.6607,
+        "steps": [
+          1708,
+          2298,
+          1621,
+          1997,
+          1822,
+          2939,
+          3167,
+          1693
+        ],
+        "gripper": 0.284,
+        "time": "2026-11-21 18:58:47"
+      }
+    },
+    {
+      "name": "bin5",
+      "how": "centre of bin 5, pointing down, jaw tips 2-4 cm above the rim",
+      "pose": {
+        "x": 0.0513,
+        "y": -0.2068,
+        "z": 0.1188,
+        "roll": -1.5111,
+        "pitch": -0.2695,
+        "yaw": -1.4324,
+        "steps": [
+          1226,
+          2275,
+          1560,
+          2059,
+          1845,
+          3024,
+          3167,
+          1693
+        ],
+        "gripper": 0.284,
+        "time": "2026-11-21 18:59:37"
+      }
+    }
+  ],
+  "derived": {
+    "table_z_m": 0.008,
+    "homography_file": "agent/config/robot_homography.json",
+    "rms_mm": 5.0,
+    "worst_loo_mm": 12.2,
+    "crosses_used": 9,
+    "grip": {
+      "z_above_table_m": -0.0001,
+      "roll": -1.5366,
+      "pitch": -0.0946,
+      "yaw": -0.4509,
+      "gripper_closed_on_pack": 0.45,
+      "hover_offset_m": 0.05
+    }
+  }
+}
