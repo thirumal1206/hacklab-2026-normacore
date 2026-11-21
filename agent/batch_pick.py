@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import real  # noqa: E402
+import voice_ctl  # noqa: E402
 
 
 def parse(arg):
@@ -84,7 +85,8 @@ def vision_targets(drop):
     return keep
 
 
-def main(argv):
+def main(argv, ctl=None):
+    """ctl: a voice_ctl.Control (voice_batch.py passes one); None = no voice control."""
     go, vision = "--go" in argv, "--vision" in argv
     args = [a for a in argv if a not in ("--go", "--vision")]
     if len(args) < (1 if vision else 2):
@@ -110,38 +112,76 @@ def main(argv):
             rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(angle, f))
             try:
                 for z in (hover, zg):
-                    real.free_move(x_cm / 100, y_cm / 100, z, rpy, "check", None, *none, execute=False)
+                    while True:
+                        voice_ctl.check(ctl)
+                        try:
+                            real.free_move(x_cm / 100, y_cm / 100, z, rpy, "check", None, *none, execute=False)
+                            break
+                        except real.Stopped:  # paused by voice during the check: wait, then solve again
+                            if ctl is None:
+                                raise
                 ok.append((x_cm, y_cm, angle))
             except real.Refused as e:
                 print(f"  skip ({x_cm:.1f}, {y_cm:.1f}) cm: {e}")
+            except voice_ctl.Aborted:
+                voice_ctl.say("Aborted.")
+                return {"done": 0, "found": len(targets), "seconds": 0, "bin": ctl.bin}
         targets = ok
+        if ctl:
+            voice_ctl.say(f"Picking {len(targets)} candies into bin {bin_name[3:]}." if targets else "I see nothing I can pick.")
         print(f"{len(targets)} reachable, picking into {bin_name}{'' if go else ' (dry run)'}")
-    t0 = time.monotonic()
+    t0, done = time.monotonic(), 0
     for i, (x_cm, y_cm, angle) in enumerate(targets, 1):
         t, times = time.monotonic(), []
 
-        def step(label, fn, *a, **k):  # run one command and note how long it took
-            s = time.monotonic()
-            out = fn(*a, **k)
+        def step(label, fn, *a, **k):  # run one command (after the voice check) and note how long it took
+            while True:
+                voice_ctl.check(ctl)
+                s = time.monotonic()
+                try:
+                    out = fn(*a, **k)
+                    break
+                except real.Stopped:  # STOP came between the check and the command: pause there, then retry
+                    if ctl is None:
+                        raise
             times.append(f"{label} {time.monotonic() - s:.1f}")
             return out
 
         x, y = x_cm / 100, y_cm / 100
         rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(angle, f))
-        if not real.DRY:
-            real.set_jaw(g["open"])  # no separate open command: the hover move carries gripper = open
-        step("hover", real.free_move, x, y, hover, rpy, "hover", None, *none)
-        step("down", real.free_move, x, y, zg, rpy, "down", None, *none)
         at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, zg, *rpy)))
-        step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
-        step("up", real.free_move, x, y, hover, rpy, "up", None, *none, loaded=True)
-        step("bin", real.move, drop, f"{bin_name} drop", loaded=True)
-        step("open", real.grip, g["open"], at=drop)
-        print(f"{i}/{len(targets)} ({x_cm:.1f}, {y_cm:.1f}) cm -> {bin_name}  {time.monotonic() - t:.1f} s   "
+        held = False
+        try:
+            if not real.DRY:
+                real.set_jaw(g["open"])  # no separate open command: the hover move carries gripper = open
+            step("hover", real.free_move, x, y, hover, rpy, "hover", None, *none)
+            step("down", real.free_move, x, y, zg, rpy, "down", None, *none)
+            step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
+            held = True
+            step("up", real.free_move, x, y, hover, rpy, "up", None, *none, loaded=True)
+            bin_now = ctl.bin if ctl else bin_name  # "bin 3" said before here still counts for this candy
+            drop = real.bin_pose(bin_now)["drop"]
+            step("bin", real.move, drop, f"{bin_now} drop", loaded=True)
+            step("open", real.grip, g["open"], at=drop)
+            held = False
+        except voice_ctl.Aborted:
+            real.STOP.unlink(missing_ok=True)
+            if held:  # put it back where it was picked, from straight above
+                real.free_move(x, y, hover, rpy, "abort hover", None, *none, loaded=True)
+                real.free_move(x, y, zg, rpy, "abort down", None, *none, loaded=True)
+                real.grip(g["open"], at=at)
+                real.free_move(x, y, hover, rpy, "abort up", None, *none)
+            voice_ctl.say("Aborted." + (" Put the candy back." if held else ""))
+            break
+        done += 1
+        print(f"{i}/{len(targets)} ({x_cm:.1f}, {y_cm:.1f}) cm -> {bin_now}  {time.monotonic() - t:.1f} s   "
               f"[{', '.join(times)}]", flush=True)
+        if ctl and ctl.cancel:
+            break
     real.home()
-    print(f"done: {len(targets)} objects in {time.monotonic() - t0:.1f} s")
-
+    print(f"done: {done} of {len(targets)} objects in {time.monotonic() - t0:.1f} s")
+    return {"done": done, "found": len(targets), "seconds": round(time.monotonic() - t0, 1),
+            "bin": ctl.bin if ctl else bin_name}
 
 if __name__ == "__main__":
     main(sys.argv[1:])

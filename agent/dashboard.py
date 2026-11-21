@@ -12,7 +12,8 @@ from pathlib import Path
 RUNS = Path(__file__).resolve().parent.parent / "runs" / "agent"
 PORT = int(os.environ.get("DASH_PORT", "8770"))
 SAID = RUNS.parent / "said.jsonl"  # written by arm.Voice
-STOP_WORDS = re.compile(r"\b(stop|wait|cancel|freeze|halt)\b", re.I)
+STOP_WORDS = re.compile(r"\b(stop|wait|pause|freeze|halt|hold on)\b", re.I)  # "cancel" ends a batch gracefully instead
+RESUME_WORDS = re.compile(r"\b(continue|resume|go on|carry on|keep going)\b", re.I)
 
 
 def heard(text):
@@ -23,6 +24,8 @@ def heard(text):
     (RUNS / "hush").touch()
     if STOP_WORDS.search(text):
         (RUNS / "STOP").touch()
+    elif RESUME_WORDS.search(text):  # a person in the room releases their own stop
+        (RUNS / "STOP").unlink(missing_ok=True)
     with (RUNS / "inbox.jsonl").open("a") as fh:
         fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": text}) + "\n")
 
