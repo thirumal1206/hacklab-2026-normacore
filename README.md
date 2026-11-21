@@ -73,6 +73,7 @@ Use headphones: otherwise the microphone can hear her voice. Chrome sends microp
 ```
 It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Friday (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Friday, sort the table", or type into the box. "Friday, stop" or the STOP button freezes everything until RESUME.
 On the arm laptop: `AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh` (needs Station, the IK service and a filled `agent/config/`). Add `AGENT_DRY_RUN=1` the first time: it plans every move and moves nothing.
+After a run: `.venv/bin/python agent/report.py` prints what happened per pack (what Claude read, the bin, the outcome) and every arm step that went wrong (refused, stopped, nothing caught, or ended more than 10 mm from its target). The raw logs are `runs/agent/proof.jsonl` (decisions) and `runs/agent/motion.jsonl` (every arm step: asked vs reached position, motor steps, gripper opening, time).
 
 ## 6. Daily workflow
 ```bash
