@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "mode": "free_placement",
+  "status": "provisional",
+  "motion_verified": false,
+  "execution_enabled": false,
+  "source_commit": "69b3837",
+  "cameras": {
+    "_help": "Station camera queue ids (GET /api/v1/cameras). They change when a camera is replugged.",
+    "top_id": "835446b047547e89f1f2e588eedf268b",
+    "gripper_id": "d5a32354709677c4d2c35cf66ea1b6c6",
+    "top_resolution": [
+      1920,
+      1080
+    ]
+  },
+  "calibration": {
+    "file": "overview_homography.provisional.json",
+    "native_image_size": [
+      1920,
+      1080
+    ],
+    "homography_image_size": [
+      1280,
+      720
+    ],
+    "native_pixel_scale": 0.6666666666666666,
+    "matrix_output_units": "meters",
+    "tool_output_units": "centimeters",
+    "frame": "robot_base_estimate",
+    "fitted_at_z_cm": 0,
+    "rms_mm": 1.56,
+    "max_mm": 2.43
+  },
+  "search_polygon_native_px": [
+    [
+      630,
+      448
+    ],
+    [
+      1298,
+      429
+    ],
+    [
+      1600,
+      959
+    ],
+    [
+      352,
+      1044
+    ]
+  ],
+  "candidate_pick_polygon_xy_cm": [
+    [
+      17.76,
+      5.4
+    ],
+    [
+      15.2,
+      10.78
+    ],
+    [
+      10.42,
+      11.92
+    ],
+    [
+      4.49,
+      7.43
+    ],
+    [
+      1.6,
+      -9.75
+    ],
+    [
+      2.63,
+      -17.57
+    ],
+    [
+      8.2,
+      -15.26
+    ],
+    [
+      16.05,
+      -7.93
+    ]
+  ],
+  "verified_pick_polygon_xy_cm": null,
+  "boundary_margin_cm": null,
+  "read_height_cm": null,
+  "hover_height_cm": null,
+  "grasp_height_cm": null,
+  "notes": [
+    "Candidate boundary is the convex hull of ruler calibration points, not a verified reach boundary.",
+    "Paper polygon was selected from an earlier frame and needs checking against current camera placement.",
+    "Execution flags require enforcement by the tools. Existing code does not consume this schema."
+  ]
+}
