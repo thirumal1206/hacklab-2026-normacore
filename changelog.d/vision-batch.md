@@ -1,0 +1,1 @@
+- Batch pick `--vision`: positions and jaw angles from one top-camera frame (Ash's outline detector on the paper sheet, robot homography refit on 7 robot-touched crosses for the current camera), IK pre-check skips unreachable objects, marked frame saved to runs/agent/vision_batch.jpg. No Claude in the loop.
