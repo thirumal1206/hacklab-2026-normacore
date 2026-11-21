@@ -23,6 +23,16 @@ class Stopped(Exception):
     pass
 
 
+CONTEXT = {"pack": None, "seq": None}  # which pack and sequence the next steps belong to
+
+
+def log(**row):
+    """One line per arm step in runs/agent/motion.jsonl: what was asked, what the arm did, how far off, how long."""
+    RUNS.mkdir(parents=True, exist_ok=True)
+    with (RUNS / "motion.jsonl").open("a") as fh:
+        fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), **CONTEXT, **row}) + "\n")
+
+
 def cfg(name):
     return json.loads((CONFIG / name).read_text())
 
@@ -55,9 +65,13 @@ def steps_now():
 
 def move(pose, label, loaded=False):
     if STOP.exists():
+        log(step=label, kind="move", result="stopped")
         raise Stopped(f"stopped by a person before '{label}'")
     if not pose:
+        log(step=label, kind="move", result="not taught")
         raise RuntimeError(f"pose '{label}' is not taught: agent/teach.py")
+    t0 = time.time()
+    target = {k: round(pose[k] * 100, 1) for k in "xyz"}
     m = cfg("motion.json")
     sp = m["speed"]["loaded" if loaded else "empty"]
     body = {"position": {"x": pose["x"], "y": pose["y"], "z": pose["z"]},
@@ -66,19 +80,32 @@ def move(pose, label, loaded=False):
     plan = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": False})
     diff = max(abs(a - b) for a, b in zip(plan.get("motor_steps", [])[:7], pose["steps"][:7]))
     if diff > m["safety"]["max_step_diff"]:
+        log(step=label, kind="move", target_cm=target, step_diff=diff, result="refused: flipped joint")
         raise RuntimeError(f"'{label}': IK solution is {diff} steps from the taught pose (flipped joint?), not moving")
     r = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)
-    return r.get("motion", {}).get("status")
+    status = r.get("motion", {}).get("status")
+    a = follower()
+    got = {k: round(a["pose"]["position"][k] * 100, 1) for k in "xyz"}
+    off = round(10 * sum((got[k] - target[k]) ** 2 for k in "xyz") ** 0.5, 1)
+    log(step=label, kind="move", loaded=loaded, speed=sp["speed"], target_cm=target, reached_cm=got, off_mm=off,
+        step_diff=diff, status=status, seconds=round(time.time() - t0, 2),
+        steps=[j["steps"] for j in sorted(a["joints"], key=lambda j: j["motor"])])
+    return status
 
 
 def grip(opening):
     if STOP.exists():
+        log(step="gripper", kind="grip", result="stopped")
         raise Stopped("stopped by a person before the gripper move")
+    t0 = time.time()
     m = cfg("motion.json")
     api("POST", f"/arms/{m['follower_bus']}/gripper", {"open": opening, "speed": m["speed"]["empty"]["speed"],
                                                         "accel": m["speed"]["empty"]["accel"]})
     time.sleep(m["grasp"]["settle_s"])
-    return follower().get("gripper") or 0.0
+    got = follower().get("gripper") or 0.0
+    log(step="close" if opening < 0.5 else "open", kind="grip", asked=opening, opening=round(got, 3),
+        seconds=round(time.time() - t0, 2))
+    return got
 
 
 def slot(name_or_xy):
@@ -96,6 +123,7 @@ def bin_pose(name):
 # ---- the interface sorter.py calls (same as FakeBackend) ----
 
 def home():
+    CONTEXT["seq"] = "home"
     move(cfg("motion.json")["poses"]["home"], "home")
     return {"ok": True}
 
@@ -106,6 +134,7 @@ STEP_KINDS = ("home", "slot.", "bin.", "open", "close", "photo", "wait:")
 def run_seq(name, s=None, b=None, pack_id=None):
     """Play one sequence from motion.json. Returns the gripper opening after the last close and the photo path, if any."""
     m = cfg("motion.json")
+    CONTEXT.update(pack=pack_id or (s or {}).get("name") or CONTEXT["pack"], seq=name)
     bad = [st for st in m["sequences"][name] if not st.startswith(STEP_KINDS) or st in ("slot.", "bin.")]
     if bad:  # checked before the first move, so a typo never leaves the arm halfway
         raise RuntimeError(f"unknown step {bad[0]!r} in sequence {name}; steps: {', '.join(STEP_KINDS)}")
@@ -126,6 +155,7 @@ def run_seq(name, s=None, b=None, pack_id=None):
             path = RUNS / f"crop_{pack_id}.jpg"
             path.write_bytes(api("GET", f"/cameras/{cfg('workspace.json')['cameras']['gripper_id']}/image"))
             out["photo"] = str(path)
+            log(step="photo", kind="photo", photo=path.name)
         elif step.startswith("wait:"):
             time.sleep(float(step[5:]))
         else:
@@ -140,6 +170,7 @@ def pick(x_cm, y_cm, angle=0, height_class="flat"):
     except Stopped as e:
         return {"holding": False, "reason": str(e)}
     if opening < g["empty_below"]:
+        log(step="grasp check", kind="check", result=f"nothing caught: opening {opening:.2f} < {g['empty_below']}")
         grip(g["open"])
         return {"holding": False, "reason": f"jaws closed to {opening:.2f}: nothing caught in {s['name']}"}
     return {"holding": True, "reason": f"jaws stalled at {opening:.2f}", "slot": s["name"]}

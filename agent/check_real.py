@@ -13,6 +13,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 TMP = Path(tempfile.mkdtemp())
+(HERE.parent / "runs" / "agent" / "motion.jsonl").unlink(missing_ok=True)
 shutil.copytree(HERE / "config", TMP / "config")
 os.environ["AGENT_CONFIG_DIR"] = str(TMP / "config")
 os.environ["AGENT_BACKEND"] = "real"
@@ -181,6 +182,21 @@ try:
     check("STOP before a move: pick returns stopped, no move sent", not r["holding"] and "stopped" in r["reason"])
 finally:
     real.STOP.unlink()
+
+log = [json.loads(x) for x in (real.RUNS / "motion.jsonl").read_text().splitlines() if x.strip()][-200:]
+moves = [r for r in log if r["kind"] == "move" and r.get("off_mm") is not None]
+check(f"motion log: every executed move has asked, reached, off_mm, seconds, steps ({len(moves)} moves)",
+      moves and all({"target_cm", "reached_cm", "off_mm", "seconds", "steps", "pack", "seq"} <= r.keys() for r in moves))
+check("motion log: the sort for slot1 shows pick then place steps", any(r["pack"] == "slot1" and r["seq"] == "place" for r in log))
+check("motion log: the flipped joint is logged as refused", any("flipped" in (r.get("result") or "") for r in log))
+check("motion log: the empty grasp is logged", any("nothing caught" in (r.get("result") or "") for r in log))
+check("motion log: STOP is logged", any(r.get("result") == "stopped" for r in log))
+check("motion log: gripper opening read back after close", any(r["kind"] == "grip" and r["step"] == "close" and r["opening"] == 0.13 for r in log))
+
+import subprocess  # noqa: E402
+
+rep = subprocess.run([sys.executable, str(HERE / "report.py")], capture_output=True, text=True).stdout
+check("report: lists the packs and the arm problems", "| slot1 | Ibuprofen 400 mg | Painkillers | verified |" in rep and "flipped joint" in rep)
 
 srv.shutdown()
 shutil.rmtree(TMP)
