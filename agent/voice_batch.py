@@ -43,11 +43,11 @@ def main(argv):
                     if go:
                         real.home()
                     return
-                if re.search(voice_ctl.WORDS["resume"], t):  # a stop said while idle: release it
+                if re.search(voice_ctl.WORDS["stop"], t) or re.search(voice_ctl.WORDS["abort"], t):  # stop always wins
+                    voice_ctl.say("Stopped. Say continue when ready.")
+                elif re.search(voice_ctl.WORDS["resume"], t):  # a stop said while idle: release it
                     real.STOP.unlink(missing_ok=True)
                     voice_ctl.say("Ready.")
-                elif re.search(voice_ctl.WORDS["stop"], t):
-                    voice_ctl.say("Stopped. Say continue when ready.")
                 elif re.search(r"\bhome\b", t):
                     real.home()
                     voice_ctl.say("Home.")

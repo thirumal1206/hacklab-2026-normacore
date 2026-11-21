@@ -93,7 +93,8 @@ class Control:
         say("Paused. Say Friday, continue.")
         while real.STOP.exists() and not self.abort:
             time.sleep(0.1)
-            if "resume" in self.poll():
+            seen = self.poll()
+            if "resume" in seen and "stop" not in seen and "abort" not in seen:  # a stop word always wins
                 real.STOP.unlink(missing_ok=True)  # also when the dashboard is an older version
         if not self.abort:
             say("Continuing.")
