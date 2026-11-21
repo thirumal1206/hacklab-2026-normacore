@@ -191,11 +191,16 @@ class Sorter:
             out.append({"id": p["id"], "product": f["product"], "code": p.get("code"), "expiry": p.get("expiry"),
                         "days_left": f["days_left"], "recalled": f["recalled"], "in_reach": f["in_reach"],
                         "fragile": self.catalog.get(p.get("code"), {}).get("fragile", False)})
-        return {"today": str(self.today), "packs": out, "bins": self.bins}
+        res = {"today": str(self.today), "packs": out, "bins": self.bins}
+        (RUNS / "scan.json").write_text(json.dumps({"time": now(), **res}))  # for the dashboard
+        self.write({"time": now(), "event": "scan", "packs": len(out)})
+        return res
 
     def inspect(self, pack_id):
         p = self.packs[pack_id]
-        return {"id": pack_id, "image": self.b.crop(pack_id) if not p.get("crop") else p["crop"],
+        img = p.get("crop") or self.b.crop(pack_id)
+        self.write({"time": now(), "id": pack_id, "event": "inspect", "image": img})
+        return {"id": pack_id, "image": img,
                 "hint": "Read the code and expiry from the label. Pass them to sort as read_code / read_expiry (YYYY-MM-DD)."}
 
     def list_bins(self):

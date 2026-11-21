@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sorting agent, locked down: only the sorter MCP tools, no built-in tools, our prompt only, capped turns and spend.
 # Usage: operator/sorter/run.sh "Sort every pack on the table."    (AGENT_BACKEND=real for the robot, AGENT_DRY_RUN=1 to plan only)
-# Stop switch: touch runs/agent/STOP (every tool refuses until it is deleted).
+# Stop switch: touch runs/agent/STOP (every tool refuses until it is deleted), or the STOP button on the dashboard.
+# Dashboard: .venv/bin/python agent/dashboard.py, then http://127.0.0.1:8770
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
