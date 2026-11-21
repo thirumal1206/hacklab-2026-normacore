@@ -86,6 +86,20 @@ def colour(hsv_pixels):
     return next(name for top, name in HUES if h <= top)
 
 
+def cross_pixels(wid, hgt):
+    """Cross name -> pixel in a wid x hgt photo, from the clicks made while calibrating this profile."""
+    import csv
+
+    pts = json.loads(real.cpath("robot_points.json").read_text())
+    path = real.HERE.parent / pts.get("cross_pixels_csv", "")
+    if not path.is_file():
+        return {}
+    w0, h0 = pts.get("cross_image_size", [1280, 960])
+    far = real.cfg("motion.json").get("candy", {}).get("unreachable_crosses", ["cross_5", "cross_8"])
+    return {f"cross{r['cross']}": (float(r["u_px"]) * wid / w0, float(r["v_px"]) * hgt / h0)
+            for r in csv.DictReader(path.open()) if r.get("u_px") and f"cross_{r['cross']}" not in far}
+
+
 def look(img=None):
     """Candies on the white sheet: [{id, colour, x_cm, y_cm, angle, px}], plus a numbered image for Claude."""
     img = img if img is not None else cv2.imdecode(np.frombuffer(real.api("GET", f"/cameras/{camera()}/image"), np.uint8),
@@ -129,6 +143,15 @@ def look(img=None):
                     "angle": round(float(np.degrees(np.arctan2(y2 - y, x2 - x))), 0)})
     out.sort(key=lambda c: (-c.get("x_cm", -c["px"][1]), c.get("y_cm", c["px"][0])))
     marked = img.copy()
+    crosses = cross_pixels(wid, hgt)  # where each taught cross is in this photo (clicked during calibration)
+    near = max(6, wid // 70)  # about 1.5 cm here: the jaws need the candy that close to the cross
+    for name, (cu, cv) in crosses.items():
+        cv2.drawMarker(marked, (int(cu), int(cv)), (0, 140, 255), cv2.MARKER_CROSS, max(10, wid // 32), 2)
+        cv2.putText(marked, name.replace("cross", ""), (int(cu) + 6, int(cv) + 14), cv2.FONT_HERSHEY_SIMPLEX, wid / 1100, (0, 140, 255), 2)
+    for o in out:
+        d = {n: ((o["px"][0] - u) ** 2 + (o["px"][1] - v) ** 2) ** 0.5 for n, (u, v) in crosses.items()}
+        if d and min(d.values()) <= near:
+            o["on_cross"] = min(d, key=d.get)
     for k, c in enumerate(out, 1):
         c["id"] = f"c{k}"
         cv2.circle(marked, tuple(c["px"]), max(8, wid // 40), (0, 0, 255), 2)

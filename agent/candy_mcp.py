@@ -39,8 +39,9 @@ def run_tool(name, a):
     content = []
     if name == "look":
         objs = candy.look()
-        out = {"objects": [{k: o[k] for k in ("id", "colour", "pickable") if k in o} | ({"x_cm": o["x_cm"], "y_cm": o["y_cm"]} if o.get("pickable") else {})
+        out = {"objects": [{k: o[k] for k in ("id", "colour", "pickable", "on_cross") if k in o} | ({"x_cm": o["x_cm"], "y_cm": o["y_cm"]} if o.get("pickable") else {})
                            for o in objs]}
+        out["crosses_with_something"] = sorted({o["on_cross"] for o in objs if o.get("on_cross")})
         if objs and not any(o.get("pickable") for o in objs):
             out["note"] = "camera mapping not usable on this laptop: describe what you see, but pick only from the crosses (spots)"
         import base64
