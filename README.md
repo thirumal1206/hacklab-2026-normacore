@@ -67,7 +67,14 @@ How Codex is given permission for the socket is not verified yet; see `venue/VEN
 
 Use headphones: otherwise the microphone can hear her voice. Chrome sends microphone audio to Google for speech recognition.
 
-## 5. Daily workflow
+## 5. Pack sorter demo (dashboard + voice + Claude, one command)
+```bash
+./demo.sh                                        # fake packs, macOS voice
+```
+It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Friday (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Friday, sort the table", or type into the box. "Friday, stop" or the STOP button freezes everything until RESUME.
+On the arm laptop: `AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh` (needs Station, the IK service and a filled `agent/config/`). Add `AGENT_DRY_RUN=1` the first time: it plans every move and moves nothing.
+
+## 6. Daily workflow
 ```bash
 git switch main && git pull && uv sync         # start of the day
 git switch -c feat/<topic>                     # one branch per change

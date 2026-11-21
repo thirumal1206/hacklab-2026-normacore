@@ -1,20 +1,21 @@
 {
   "_owner": "Agent + team",
-  "_help": "Sorting policy. Claude applies it; code re-checks the vetoes and refuses a violating sort().",
+  "_help": "Sorting policy. Claude reads the name from the wrist close-up; code checks it against catalog.json and refuses a wrong bin.",
+  "mode": "name_only",
+  "unknown_bin": "Unknown",
+  "_phase2": "mode 'expiry' re-enables the expiry and recall rules below once the cameras can read them.",
   "today": "2026-11-22",
   "near_expiry_days": 30,
   "recalled_codes": [],
   "bins_in_priority_order": [
-    {"bin": "Recall", "when": "code is in recalled_codes"},
-    {"bin": "Expired", "when": "expiry is before today"},
-    {"bin": "Manual check", "when": "code unreadable after inspect, product unknown, expiry unreadable, or damaged"},
-    {"bin": "Stock", "when": "known product, readable code, expiry at least near_expiry_days away"}
-  ],
-  "vetoes": [
-    "never Stock if expired",
-    "never Stock if product unknown",
-    "never Stock if code or expiry unreadable",
-    "never Stock if recalled"
+    {
+      "bin": "<product bin>",
+      "when": "the name read on the foil matches a product in catalog.json; the bin is that product's bin"
+    },
+    {
+      "bin": "Unknown",
+      "when": "name unreadable, or not in catalog.json"
+    }
   ],
   "on_failure": {
     "grasp_failed": "tool retries once, then flag",

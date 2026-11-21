@@ -1,9 +1,10 @@
 {
   "_help": "Fake catalogue for development; the real one is agent/config/catalog.json.",
   "products": [
-    {"code": "4006381333931", "name": "Ibuprofen 400 mg, 20 tablets", "width_cm": 5.5, "depth_cm": 9.5, "height_cm": 2.0, "fragile": false},
-    {"code": "4030571012345", "name": "Paracetamol 500 mg, 10 tablets", "width_cm": 4.5, "depth_cm": 9.0, "height_cm": 1.8, "fragile": false},
-    {"code": "4150025555012", "name": "Vitamin D3 1000 IU, 60 capsules", "width_cm": 4.0, "depth_cm": 6.0, "height_cm": 4.0, "fragile": false},
-    {"code": "4260107771111", "name": "Nasal spray 10 ml", "width_cm": 3.5, "depth_cm": 3.5, "height_cm": 8.0, "fragile": true}
+    {"name": "Ibuprofen 400 mg", "aliases": ["ibuprofen"], "bin": "Painkillers"},
+    {"name": "Paracetamol 500 mg", "aliases": ["paracetamol"], "bin": "Painkillers"},
+    {"name": "Cetirizin 10 mg", "aliases": ["cetirizin", "cetirizine"], "bin": "Allergy"},
+    {"name": "Loratadin 10 mg", "aliases": ["loratadin", "loratadine"], "bin": "Allergy"},
+    {"name": "Vitamin C 500 mg", "aliases": ["vitamin c"], "bin": "Vitamins"}
   ]
 }

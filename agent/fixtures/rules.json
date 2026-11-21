@@ -1,6 +1,8 @@
 {
   "_help": "Fake rules for development; the real ones are agent/config/rules.json.",
+  "mode": "name_only",
+  "unknown_bin": "Unknown",
   "today": "2026-11-22",
   "near_expiry_days": 30,
-  "recalled_codes": ["4150025555012"]
+  "recalled_codes": []
 }
