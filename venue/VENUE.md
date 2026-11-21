@@ -42,7 +42,7 @@ Backup: the recorded video of the same run.
 0. `uv sync && make hooks && make check` must end with `ALL CHECKS PASSED`.
 1. `.venv/bin/python arm.py selfcheck --repo <norma-core checkout>` must print `ALL OK`. Keep **both** checkouts: `norma-core` (main, 6b494f7) and `norma-core-dev` (dev, 65f9ab9, reads VP8 camera frames); use the one matching the venue's Station.
 2. Print `venue/aruco_markers_A4.png` at 100%, no scaling. Measure a marker: 50 mm.
-3. Station binary: `venue/bin/station` (arm64 macOS, built from norma-core 6b494f7, plus one local patch so the built-in camera is listed; sha256 in CHANGELOG). On Linux, build from source instead.
+3. Station binary: prefer the official app (`station-macos-arm64.dmg`, v0.1.0-beta.10+): it has the web UI for calibration and teleop, see `venue/elrobot/SETUP.md`. Our build `venue/bin/station` (arm64 macOS, built from norma-core 6b494f7, plus one local patch so the built-in camera is listed; sha256 in CHANGELOG). On Linux, build from source instead.
 4. Allow camera access for the terminal app you start it from (macOS asks once).
 
 ## At the opening (ask NormaCore staff)

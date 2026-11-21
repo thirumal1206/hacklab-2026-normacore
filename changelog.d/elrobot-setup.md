@@ -1,0 +1,1 @@
+- `venue/elrobot/`: ElRobot setup guide (manual calibration, teleop via the Station web UI), hardware notes and a read-only calibration overlay, from our teammate's setup of the same kit. Auto Calibrate leaves low protection currents on ElRobot (shoulder overload seen on a 10 deg lift).
