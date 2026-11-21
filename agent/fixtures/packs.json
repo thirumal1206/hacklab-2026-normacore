@@ -1,0 +1,10 @@
+[
+  {"id": "p1", "x_cm": 15.0, "y_cm": 6.0, "angle": 0, "width_cm": 5.5, "height_class": "normal", "code": "4006381333931", "expiry": "2027-08-31", "label": "Ibuprofen 400 mg | EXP 08/2027"},
+  {"id": "p2", "x_cm": 17.0, "y_cm": -4.0, "angle": 30, "width_cm": 4.5, "height_class": "normal", "code": "4030571012345", "expiry": "2026-09-30", "label": "Paracetamol 500 mg | EXP 09/2026"},
+  {"id": "p3", "x_cm": 14.0, "y_cm": -8.0, "angle": 90, "width_cm": 4.0, "height_class": "tall", "code": "4150025555012", "expiry": "2028-01-31", "label": "Vitamin D3 1000 IU | EXP 01/2028"},
+  {"id": "p4", "x_cm": 18.5, "y_cm": 2.0, "angle": 10, "width_cm": 5.0, "height_class": "normal", "code": null, "expiry": null, "label": "Ibuprofen 400 mg | 4006381333931 | EXP 03/2027"},
+  {"id": "p5", "x_cm": 16.0, "y_cm": 9.5, "angle": 45, "width_cm": 5.0, "height_class": "normal", "code": "9999999999999", "expiry": "2027-05-31", "label": "Unknown brand cough syrup | EXP 05/2027"},
+  {"id": "p6", "x_cm": 13.5, "y_cm": 0.5, "angle": 0, "width_cm": 4.5, "height_class": "normal", "code": "4030571012345", "expiry": "2026-12-10", "label": "Paracetamol 500 mg | EXP 12/2026"},
+  {"id": "p7", "x_cm": 19.0, "y_cm": -10.0, "angle": 0, "width_cm": 3.5, "height_class": "tall", "code": "4260107771111", "expiry": "2027-11-30", "label": "Nasal spray 10 ml | EXP 11/2027"},
+  {"id": "p8", "x_cm": 24.0, "y_cm": 3.0, "angle": 0, "width_cm": 5.5, "height_class": "normal", "code": "4006381333931", "expiry": "2027-06-30", "label": "Ibuprofen 400 mg | EXP 06/2027"}
+]
