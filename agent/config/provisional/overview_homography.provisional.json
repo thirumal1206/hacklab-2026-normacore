@@ -1,0 +1,140 @@
+{
+  "status": "provisional",
+  "motion_verified": false,
+  "camera_id": "835446b047547e89f1f2e588eedf268b",
+  "H_pixel_to_xy": [
+    [
+      -2.532183995421874e-05,
+      0.007192072701177637,
+      -2.111615436639826
+    ],
+    [
+      0.004499591401439081,
+      -6.681696383393101e-05,
+      -2.9551934927130388
+    ],
+    [
+      9.61224050754916e-05,
+      0.008149260018148734,
+      1.0
+    ]
+  ],
+  "image_size": [
+    1280,
+    720
+  ],
+  "native_image_size": [
+    1920,
+    1080
+  ],
+  "points": 9,
+  "rms_mm": 1.56,
+  "max_mm": 2.43,
+  "holdout_error_mm": {
+    "2": 0.45,
+    "9": 4.68
+  },
+  "source": "Nine ruler-derived pairs; input is in normalized 1280x720 pixels; output is estimated robot-base meters.",
+  "z_note": "Crosses measured on paper; verify alignment and pack-height effects before use.",
+  "point_pairs": [
+    {
+      "cross": 1,
+      "pixel_native": [
+        798,
+        509
+      ],
+      "estimated_robot_xy_mm": [
+        82.0,
+        -152.6
+      ]
+    },
+    {
+      "cross": 2,
+      "pixel_native": [
+        882,
+        585
+      ],
+      "estimated_robot_xy_mm": [
+        160.5,
+        -79.3
+      ]
+    },
+    {
+      "cross": 3,
+      "pixel_native": [
+        1074,
+        605
+      ],
+      "estimated_robot_xy_mm": [
+        177.6,
+        54.0
+      ]
+    },
+    {
+      "cross": 4,
+      "pixel_native": [
+        1145,
+        580
+      ],
+      "estimated_robot_xy_mm": [
+        152.0,
+        107.8
+      ]
+    },
+    {
+      "cross": 5,
+      "pixel_native": [
+        784,
+        462
+      ],
+      "estimated_robot_xy_mm": [
+        26.3,
+        -175.7
+      ]
+    },
+    {
+      "cross": 6,
+      "pixel_native": [
+        941,
+        500
+      ],
+      "estimated_robot_xy_mm": [
+        73.3,
+        -41.1
+      ]
+    },
+    {
+      "cross": 7,
+      "pixel_native": [
+        1148,
+        530
+      ],
+      "estimated_robot_xy_mm": [
+        104.2,
+        119.2
+      ]
+    },
+    {
+      "cross": 8,
+      "pixel_native": [
+        876,
+        457
+      ],
+      "estimated_robot_xy_mm": [
+        16.0,
+        -97.5
+      ]
+    },
+    {
+      "cross": 9,
+      "pixel_native": [
+        1085,
+        478
+      ],
+      "estimated_robot_xy_mm": [
+        44.9,
+        74.3
+      ]
+    }
+  ]
+}
