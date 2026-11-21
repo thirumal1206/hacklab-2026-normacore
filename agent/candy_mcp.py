@@ -16,12 +16,18 @@ TOOLS = {
     "spots": ("The taped crosses on the sheet where candies are placed: id (cross1, cross2, ...) and whether the arm can reach it.", {}, []),
     "pick": ("Pick the candies on the given crosses into one bin, one after another, fast: ids like [\"cross3\", \"cross4\"], "
              "or [\"all\"] for every reachable cross (an empty cross is skipped: the jaws close on nothing). People can talk during it: "
-             "'stop' pauses, 'bin 3' switches the bin for the rest, 'continue' resumes, 'cancel' ends after the candy in hand. "
+             "'stop' pauses, 'bin 3' switches the bin for the rest, 'continue' resumes, 'cancel' ends after the candy in hand, "
+             "'abort' stops now and puts a held candy back on its cross. "
              "Returns done, remaining, bin_now, heard_while_busy.",
              {"ids": {"type": "array", "items": S}, "bin": S}, ["ids", "bin"]),
+    "session": ("What happened in this session so far: candies per bin, empty or missed crosses, aborts, the last things said. "
+                "Use it for questions like 'what's in bin 1?' or after a restart.", {}, []),
+    "end": ("End the session after a goodbye: Friday stops listening and is not restarted.", {}, []),
     "say": ("Speak one short line aloud as Friday.", {"text": S}, ["text"]),
     "listen": ("Wait for the next spoken or typed instruction. Returns instruction, or null after wait_s.", {"wait_s": {"type": "number"}}, []),
     "home": ("Move the arm to its home pose.", {}, []),
+    "grip": ("Open (release whatever is held, right where the arm is) or close the gripper. For 'release', 'open your claws', 'let go'.",
+             {"state": {"type": "string", "enum": ["open", "close"]}}, ["state"]),
 }
 ears = None
 
@@ -36,6 +42,22 @@ def run_tool(name, a):
         out = candy.pick(a["ids"], a["bin"], go=GO)
         if not GO:
             out["note"] = "dry run: CANDY_GO=1 is not set, nothing moved"
+    elif name == "grip":
+        candy.real.DRY = not GO
+        g = candy.real.cfg("motion.json")["grasp"]
+        try:
+            opening = candy.real.grip(g["open"] if a["state"] == "open" else g["close"])
+            out = {"gripper": a["state"], "opening": opening, "dry": not GO}
+        except candy.real.Stopped as e:
+            out = {"error": str(e) + ": say 'continue' first"}
+        candy.log(event="grip", state=a["state"])
+    elif name == "session":
+        out = candy.session()
+    elif name == "end":
+        (candy.RUNS / "candy_end").touch()
+        candy.real.DRY = not GO
+        candy.real.home()
+        out = {"ended": True}
     elif name == "say":
         ears = ears or candy.Ears([])
         ears.say(a["text"])

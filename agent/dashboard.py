@@ -153,7 +153,7 @@ function line(r){
   return null}
 async function tick(){
   let s;try{s=await (await fetch("/state")).json()}catch(e){document.getElementById("live").className="live off";return}
-  said=s.said||"";stopped=s.stopped;const b=document.getElementById("stop");b.textContent=stopped?"RESUME":"STOP";b.className=stopped?"resume":"";
+  said=s.said||"";if(s.speaking)quietUntil=Date.now()+1200;stopped=s.stopped;const b=document.getElementById("stop");b.textContent=stopped?"RESUME":"STOP";b.className=stopped?"resume":"";
   document.getElementById("live").className="live"+(stopped?" off":"");
   const ban=document.getElementById("banner");ban.hidden=!stopped;ban.textContent="Stopped by a person: every tool refuses until you press RESUME.";
   const ss=s.session;document.getElementById("sub").textContent=ss?`${ss.backend} backend${ss.dry_run?" · dry run":""} · started ${ss.time.slice(11)} · config ${ss.config_sha256}`:"waiting for a session";
@@ -181,6 +181,7 @@ async function tick(){
 const send=t=>t&&fetch("/heard",{method:"POST",body:JSON.stringify({text:t})}).then(tick);
 document.getElementById("talk").onsubmit=e=>{e.preventDefault();const i=document.getElementById("txt");send(i.value.trim());i.value=""};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\bfriday\b[\s,.!?]*/i,mic=document.getElementById("mic");
+let quietUntil=0;
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,"").trim();let said="",hands=null;
 const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="friday"),s=new Set(norm(said).split(" "));
   return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
@@ -200,6 +201,7 @@ else mic.onclick=()=>{
   r.onstart=()=>diag("listening: say anything, the words appear here");
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
     diag(`heard: "${t}"${WAKE.test(t)?(echo(t)?" (ignored: her own voice)":e.results[i].isFinal?" -> sent":""):" (no 'Friday': ignored)"}`);
+    if(Date.now()<quietUntil){diag(`ignored while Friday speaks: "${t}"`);continue}  // her own voice through the mic
     if(!WAKE.test(t)||echo(t))continue;
     if(!e.results[i].isFinal){fetch("/hush",{method:"POST"});continue}  // barge-in on the wake word
     send(t.slice(t.search(WAKE)).replace(WAKE,"").trim()||"yes?")}};

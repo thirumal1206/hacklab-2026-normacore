@@ -27,9 +27,29 @@ import real  # noqa: E402  (Ivan's motion: free_move, grip, jaw_yaw, bin_pose, h
 RUNS, STOP, INBOX = real.RUNS, real.STOP, real.RUNS / "inbox.jsonl"
 LOG = RUNS / "candy.jsonl"
 HUES = [(8, "red"), (20, "orange"), (34, "yellow"), (85, "green"), (130, "blue"), (160, "purple"), (180, "red")]
-CTRL = {"cancel": r"\b(cancel|abort|that'?s enough|enough)\b", "stop": r"\b(stop|wait|pause|freeze|halt|hold on)\b",
+CTRL = {"abort": r"\b(abort|emergency|drop it|put it back)\b", "cancel": r"\b(cancel|that'?s enough|enough)\b", "stop": r"\b(stop|wait|pause|freeze|halt|hold on)\b",
         "resume": r"\b(continue|resume|go on|carry on|keep going)\b"}
 NUMBERS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "to": "2", "too": "2", "for": "4"}
+
+
+class Aborted(Exception):
+    pass
+
+
+def session():
+    """What happened since this Friday session started: candies per bin, empty or missed crosses, last words."""
+    rows = [json.loads(x) for x in LOG.read_text().splitlines()] if LOG.exists() else []
+    start = max((i for i, r in enumerate(rows) if r.get("event") == "session"), default=0)
+    rows = rows[start:]
+    bins, missed = {}, []
+    for r in rows:
+        if r.get("event") == "picked" and r.get("result") == "dropped":
+            bins.setdefault(r["bin"], []).append(r["id"])
+        if r.get("event") == "missed":
+            missed.append(r["id"])
+    talk = [f"{'You' if r['event'] == 'heard' else 'Friday'}: {r['text']}" for r in rows if r.get("event") in ("heard", "say")]
+    return {"started": rows[0].get("time") if rows else None, "in_bins": bins, "empty_or_missed": sorted(set(missed)),
+            "aborted": [r["id"] for r in rows if r.get("event") == "aborted"], "stopped_now": STOP.exists(), "recent_talk": talk[-12:]}
 
 
 def log(**row):
@@ -156,7 +176,7 @@ class Ears:
             text = json.loads(line)["text"]
             log(event="heard", text=text)
             c = parse(text, self.bins)
-            if not (c["bin"] or c["cancel"] or c["stop"] or c["resume"]):
+            if not (c["bin"] or c["cancel"] or c["stop"] or c["resume"] or c["abort"]):
                 self.unclear.append(text)
             out.append(c)
         return out
@@ -180,7 +200,7 @@ def pick(ids, bin_name, go=False, candies=None):
         return {"error": f"unknown bin {bin_name}; bins: {', '.join(bins)}"}
     g, zg0 = m["grasp"], d["table_z_m"] + f["grip_z_above_table_cm"] / 100
     hover0 = zg0 + f["hover_above_grip_cm"] / 100
-    ears, st = Ears(bins), {"bin": bin_name, "cancel": False, "pauses": 0, "switches": []}
+    ears, st = Ears(bins), {"bin": bin_name, "cancel": False, "abort": False, "pauses": 0, "switches": []}
 
     def hear():
         for c in ears.news():
@@ -188,7 +208,10 @@ def pick(ids, bin_name, go=False, candies=None):
                 st["bin"] = c["bin"]
                 st["switches"].append(c["bin"])
                 ears.say(f"Switching to {c['bin']}.")
-            if c["cancel"] and not st["cancel"]:
+            if c["abort"] and not st["abort"]:
+                st["abort"] = st["cancel"] = True
+                ears.say("Aborting.")
+            elif c["cancel"] and not st["cancel"]:
                 st["cancel"] = True
                 ears.say("Cancelling after this one.")
 
@@ -209,6 +232,8 @@ def pick(ids, bin_name, go=False, candies=None):
         """Run one motion step; if STOP stops it before it moves, pause and run the same step again."""
         while True:
             wait_if_stopped()
+            if st["abort"]:
+                raise Aborted()
             try:
                 return fn()
             except real.Stopped:
@@ -229,7 +254,10 @@ def pick(ids, bin_name, go=False, candies=None):
             zg = P["z"] + f["grip_z_above_table_cm"] / 100
             hover = zg + f["hover_above_grip_cm"] / 100
         none = (0, range(0))
+        holding = False
         lower = real.cfg("motion.json").get("candy", {}).get("retry_lower_cm", [0.5, 0.8])  # each retry goes this much lower
+        if ids == ["all"]:
+            lower = []  # "everything": empty crosses are expected, and empty vs slipped look the same (jaws fully closed)
         try:
             step(lambda: real.free_move(x, y, hover, rpy, "hover", None, *none))
             for attempt, dz in enumerate([0.0, *lower]):
@@ -245,16 +273,28 @@ def pick(ids, bin_name, go=False, candies=None):
                 if attempt < len(lower):
                     step(lambda: real.grip(g["open"], at=at))  # open where it is and try again a little lower
             if opening is not None and opening >= g["empty_below"]:
+                holding = True
                 step(lambda: real.grip(max(opening - g.get("relief", 0.04), 0.0), at=at))
             step(lambda: real.free_move(x, y, hover, rpy, "up", None, *none, loaded=True))
             if opening is not None and opening < g["empty_below"]:
-                done.append({"id": c["id"], "result": f"missed {attempt + 1} times: jaws closed to {opening:.2f}"})
+                done.append({"id": c["id"], "result": ("empty or missed" if ids == ["all"] else f"missed {attempt + 1} times")
+                             + f": jaws closed to {opening:.2f}"})
                 continue
             hear()  # a bin switch said while the candy is in the jaws still counts
             target = st["bin"]
             drop = real.bin_pose(target)["drop"]
             step(lambda: real.move(drop, f"{target} drop", loaded=True))
             step(lambda: real.grip(g["open"], at=drop))
+            holding = False
+        except Aborted:
+            if holding and not real.DRY:  # put the candy back where it came from, then stop
+                real.free_move(x, y, hover, rpy, "back hover", None, *none, loaded=True)
+                real.free_move(x, y, zg, rpy, "back down", None, *none, loaded=True)
+                real.grip(g["open"], at=at)
+                real.free_move(x, y, hover, rpy, "back up", None, *none)
+            done.append({"id": c["id"], "result": "aborted" + (": put back on its cross" if holding else "")})
+            log(event="aborted", id=c["id"], put_back=holding)
+            break
         except real.Refused as e:
             done.append({"id": c["id"], "result": f"refused: {e}"})
             log(event="refused", id=c["id"], reason=str(e))
@@ -263,10 +303,10 @@ def pick(ids, bin_name, go=False, candies=None):
                "result": "dry run" if real.DRY else "dropped"}
         done.append(res)
         log(event="picked", **res)
-    step(real.home)
+    real.home() if st["abort"] else step(real.home)
     handled = {r["id"] for r in done}
     out = {"done": done, "remaining": [c["id"] for c in todo if c["id"] not in handled], "bin_now": st["bin"],
-           "switched_to": st["switches"], "pauses": st["pauses"], "cancelled": st["cancel"],
+           "switched_to": st["switches"], "pauses": st["pauses"], "cancelled": st["cancel"], "aborted": st["abort"],
            "seconds": round(time.monotonic() - t0, 1)}
     if ears.unclear:
         out["heard_while_busy"] = ears.unclear
