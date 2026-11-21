@@ -49,7 +49,7 @@ def camera():
 
 
 def to_robot(u, v, width):
-    h = json.loads((real.HERE / "config" / "robot_homography.json").read_text())
+    h = json.loads(real.cpath("robot_homography.json").read_text())
     s = h["image_size"][0] / width  # the homography was fitted on image_size frames
     x, y = cv2.perspectiveTransform(np.float32([[[u * s, v * s]]]), np.array(h["H_pixel_to_xy"]))[0, 0]
     return float(x) * 100, float(y) * 100
@@ -107,7 +107,7 @@ def look(img=None):
 
 def spots():
     """The crosses taped on the sheet, at the robot positions Ivan recorded with the arm (no camera needed)."""
-    pts = json.loads((real.HERE / "config" / "robot_points.json").read_text())["points"]
+    pts = json.loads(real.cpath("robot_points.json").read_text())["points"]
     far = real.cfg("motion.json").get("candy", {}).get("unreachable_crosses", ["cross_5", "cross_8"])  # too close to hover over
     return [{"id": "cross" + p["name"].split("_")[1], "colour": "?", "x_cm": round(p["pose"]["x"] * 100, 1),
              "y_cm": round(p["pose"]["y"] * 100, 1), "angle": 0, "reachable": p["name"] not in far}

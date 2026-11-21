@@ -24,7 +24,22 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CONFIG = Path(os.environ.get("AGENT_CONFIG_DIR", HERE / "config"))
+def find_profile():
+    """Calibration profile for this laptop: AGENT_CONFIG_DIR, else AGENT_PROFILE, else the profile listing this hostname."""
+    if os.environ.get("AGENT_CONFIG_DIR"):
+        return Path(os.environ["AGENT_CONFIG_DIR"]), "custom"
+    import socket
+    import subprocess
+
+    host = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True).stdout.strip() or socket.gethostname()
+    for d in sorted((HERE / "config" / "profiles").glob("*/profile.json")):
+        p = json.loads(d.read_text())
+        if os.environ.get("AGENT_PROFILE") == d.parent.name or (not os.environ.get("AGENT_PROFILE") and host in p.get("hostnames", [])):
+            return d.parent, d.parent.name
+    return HERE / "config", None
+
+
+CONFIG, PROFILE = find_profile()
 RUNS = HERE.parent / "runs" / "agent"
 STOP = RUNS / "STOP"
 JAW = RUNS / "jaw_goal.txt"  # last gripper goal sent; every command repeats it (see jaw_goal)
@@ -36,7 +51,12 @@ class Stopped(Exception):
 
 
 def cfg(name):
-    return json.loads((CONFIG / name).read_text())
+    return json.loads(cpath(name).read_text())
+
+
+def cpath(name):
+    """A config file from the active profile, falling back to the shared agent/config (catalog, rules, ...)."""
+    return CONFIG / name if (CONFIG / name).exists() else HERE / "config" / name
 
 
 def api(method, path, body=None, timeout=20):
@@ -87,7 +107,16 @@ def set_jaw(opening):
     JAW.write_text(str(opening))
 
 
+def need_profile():
+    if PROFILE is None and not DRY:
+        import socket
+
+        raise Refused(f"no calibration profile for this laptop ({socket.gethostname()}): recorded positions are only right on "
+                      "the laptop they were recorded on. Set AGENT_PROFILE=<name> or add this hostname to its profile.json")
+
+
 def move(pose, label, loaded=False):
+    need_profile()
     if STOP.exists():
         raise Stopped(f"stopped by a person before '{label}'")
     if not pose:
@@ -203,7 +232,8 @@ class Refused(Exception):
 def free_settings():
     m = cfg("motion.json")
     f = m["free_pick"]
-    d = json.loads((HERE.parent / f["points_file"]).read_text()).get("derived") or {}
+    need_profile()
+    d = json.loads(cpath(Path(f["points_file"]).name).read_text()).get("derived") or {}
     if "table_z_m" not in d or "grip" not in d:
         raise Refused("robot_points.json has no table height or grip_ref yet: run agent/record_points.py fit")
     return m, f, d

@@ -1,0 +1,9 @@
+{
+  "_help": "Calibration recorded on one laptop. Station keeps its calibration per laptop, so these positions are only right on the laptop listed here. A laptop is matched by its LocalHostName (scutil --get LocalHostName), or chosen with AGENT_PROFILE=<folder name>.",
+  "name": "ivan",
+  "laptop": "Ivan's MacBook Air (the one the arm was calibrated and recorded on)",
+  "hostnames": [],
+  "recorded": "2026-11-21, agent/record_points.py, crosses RMS 5 mm; batch pick 7 candies in 131 s",
+  "source_commit": "dc467b8",
+  "follower_bus": "5B79016927"
+}
