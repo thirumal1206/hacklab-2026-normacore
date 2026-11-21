@@ -6,7 +6,7 @@
 
 Detection (no outlines, so a gap in an edge cannot lose an object):
   - background mode (runs/agent/background.jpg exists): object = differs from the empty-table photo
-  - paper mode (default): object = coloured, clearly darker/brighter than the paper around it, or textured (print)
+  - paper mode (default): object = coloured, clearly darker than the paper around it, or textured (print); glare ignored
   Thin drawn lines and tape crosses are removed by an opening filter; anything touching the paper border (mug, box,
   the arm reaching in) is dropped. Pixels -> robot cm with robot_homography.json plus batch_pick.VISION_OFFSET_CM.
 Tracking: a detection within MATCH_CM of a track updates it (averaged); a track is "confirmed" after CONFIRM sightings
@@ -40,7 +40,9 @@ ALPHA = 0.5  # weight of the newest detection in the averaged position
 MIN_AREA_PX = 250  # at 1280x960; a candy is about 1500-3000 px
 # ADJUST if detection is too eager or too blind
 SAT_MIN = 70  # paper mode: saturation that counts as "coloured"
-PAPER_DELTA = 25  # paper mode: this much darker or brighter than the local paper counts
+PAPER_DELTA = 25  # paper mode: this much darker than the local paper counts
+GLARE_V = 225  # paper mode: brighter than this and colourless = reflection, ignored
+FRESH_S = 0.5  # world.json lists only objects seen this recently (no ghosts of moved objects); 2 frames at 5 Hz
 TEXTURE_MIN = 14  # paper mode: printed wrappers are busy, paper is smooth (blurred |Laplacian|)
 BG_DELTA = 35  # background mode: colour difference that counts
 
@@ -52,22 +54,41 @@ def grab():
     return img
 
 
+_bg = {"mtime": None, "img": None}
+
+
+def background():
+    """The empty-table photo, loaded once (again only when the file changes); None in paper mode."""
+    try:
+        mtime = BACKGROUND.stat().st_mtime
+    except OSError:
+        return None
+    if mtime != _bg["mtime"]:
+        _bg.update(mtime=mtime, img=cv2.imread(str(BACKGROUND)))
+    return _bg["img"]
+
+
 def object_mask(img, paper):
-    if BACKGROUND.exists():
-        bg = cv2.imread(str(BACKGROUND))
+    bg = background()
+    if bg is not None and bg.shape != img.shape:
+        raise RuntimeError(f"background.jpg is {bg.shape[1]}x{bg.shape[0]}, camera {img.shape[1]}x{img.shape[0]}: retake it")
+    if bg is not None:
         a, b = cv2.GaussianBlur(img, (5, 5), 0).astype(np.int16), cv2.GaussianBlur(bg, (5, 5), 0).astype(np.int16)
         m = (np.abs(a - b).max(axis=2) > BG_DELTA).astype(np.uint8) * 255
     else:
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         local = cv2.medianBlur(gray, 51)  # paper brightness around each pixel (handles shading)
+        # glare (shiny tape, reflections): very bright and colourless; never an object, and its edges are not "print"
+        glare = cv2.dilate(((hsv[..., 2] > GLARE_V) & (hsv[..., 1] < 40)).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
         lap = np.abs(cv2.Laplacian(cv2.GaussianBlur(gray, (3, 3), 0), cv2.CV_16S, ksize=3)).astype(np.float32)
-        textured = (cv2.blur(lap, (5, 5)) > TEXTURE_MIN).astype(np.uint8) * 255
-        plain = ((hsv[..., 1] > SAT_MIN) | (np.abs(gray.astype(np.int16) - local.astype(np.int16)) > PAPER_DELTA)).astype(np.uint8) * 255
+        textured = ((cv2.blur(lap, (5, 5)) > TEXTURE_MIN) & ~glare).astype(np.uint8) * 255
+        darker = local.astype(np.int16) - gray.astype(np.int16) > PAPER_DELTA  # only darker: brighter is glare
+        plain = ((hsv[..., 1] > SAT_MIN) | darker).astype(np.uint8) * 255
         # open each cue on its own: a pen line is a few px wide in "plain" and about 8 px in "textured"
         m = cv2.morphologyEx(plain, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) | \
             cv2.morphologyEx(textured, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
-    if BACKGROUND.exists():
+    if bg is not None:
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))  # removes specks
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))  # joins a wrapper's wings to its body
     return cv2.bitwise_and(m, paper)
@@ -133,7 +154,7 @@ def state(objs, now, ms):
             "objects": [{"id": t["id"], "x_cm": round(t["x_cm"], 1), "y_cm": round(t["y_cm"], 1), "jaw_deg": round(t["jaw_deg"], 1),
                          "width_cm": round(t["width_cm"], 1), "length_cm": round(t["length_cm"], 1), "pickable": t["pickable"],
                          "why": t["why"], "age_s": round(now - t["first"], 1), "seen_s_ago": round(now - t["seen"], 2)}
-                        for t in sorted(objs, key=lambda t: t["id"])]}
+                        for t in sorted(objs, key=lambda t: t["id"]) if now - t["seen"] <= FRESH_S]}
 
 
 def draw(img, poly, objs):
@@ -218,14 +239,14 @@ def run():
                 cv2.imwrite(str(OVERLAY.with_suffix(".tmp.jpg")), draw(img, poly, objs))
                 OVERLAY.with_suffix(".tmp.jpg").replace(OVERLAY)
                 last_img = time.monotonic()
-        except (OSError, RuntimeError, ValueError) as e:
+        except (OSError, RuntimeError, ValueError, cv2.error) as e:  # log and keep going; world.json goes stale
             print(f"vision: {e}", flush=True)
             time.sleep(0.5)
         time.sleep(max(0.0, 1 / HZ - (time.monotonic() - t0)))
 
 
 def world(max_age_s=1.0):
-    """For the arm worker: the latest confirmed objects, or None if the vision service is not running."""
+    """For the arm worker: the latest confirmed objects (each seen within FRESH_S), or None if the service is not running."""
     try:
         s = json.loads(WORLD.read_text())
     except (OSError, ValueError):
