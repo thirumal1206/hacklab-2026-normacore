@@ -155,7 +155,7 @@
     "open": 1.0,
     "close": 0.0,
     "empty_below": 0.05,
-    "settle_s": 1.5,
+    "settle_s": 0,
     "retries": 1,
     "relief": 0.04,
     "_relief_help": "after the close stalls on a pack, the gripper goal is set this far (0..1 opening) inside the measured opening: moderate squeeze instead of a hard stall"
