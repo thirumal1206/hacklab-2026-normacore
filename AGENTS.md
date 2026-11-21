@@ -16,7 +16,7 @@ The LLM supervises: it chooses targets (numbered marks from `locate`), plans, ve
 | `operator/` | What the robot-driving agent reads (`AGENTS.md`) and its `.mcp.json` |
 | `elrobot/` | ElRobot URDF, meshes, IK (`ik.py`), kinematics check (`check.py`) |
 | `so101-sim/` | MuJoCo SO-101 tabletop scenes: `so101_tabletop.xml` (cubes), `_objects` (pen, cup, eraser, tape), `_pencil` |
-| `venue/` | Venue checklist (`VENUE.md`), `start.sh`, `station.yaml` |
+| `venue/` | Venue checklist (`VENUE.md`), `start.sh`, `station.yaml`; `elrobot/` setup guide, calibration and teleop |
 | `rust/` | Rust port of IK and segmentation, benchmark only, not wired in |
 | `docs/DESIGN.md`, `docs/RESEARCH.md` | Design decisions; what other teams and papers found |
 | `CHANGELOG.md`, `changelog.d/` | Experiment log with measured results; new entries go in `changelog.d/` |
