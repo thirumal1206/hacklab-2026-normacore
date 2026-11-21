@@ -1,0 +1,1 @@
+- `agent/config/`: templates for workspace, motion, vision, catalog and rules, with owners and how to measure. Not yet filled in.
