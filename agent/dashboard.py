@@ -12,7 +12,8 @@ from pathlib import Path
 RUNS = Path(__file__).resolve().parent.parent / "runs" / "agent"
 PORT = int(os.environ.get("DASH_PORT", "8770"))
 SAID = RUNS.parent / "said.jsonl"  # written by arm.Voice
-STOP_WORDS = re.compile(r"\b(stop|wait|cancel|freeze|halt)\b", re.I)
+STOP_WORDS = re.compile(r"\b(stop|wait|pause|freeze|halt|hold on)\b", re.I)  # "cancel" ends a batch gracefully instead
+RESUME_WORDS = re.compile(r"\b(continue|resume|go on|carry on|keep going)\b", re.I)
 
 
 def heard(text):
@@ -23,6 +24,8 @@ def heard(text):
     (RUNS / "hush").touch()
     if STOP_WORDS.search(text):
         (RUNS / "STOP").touch()
+    elif RESUME_WORDS.search(text):  # a person in the room releases their own stop
+        (RUNS / "STOP").unlink(missing_ok=True)
     with (RUNS / "inbox.jsonl").open("a") as fh:
         fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": text}) + "\n")
 
@@ -125,6 +128,7 @@ td{padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}.why{colo
 </style></head><body>
 <header><div class="live" id="live"></div><div><h1>Pack Sorter</h1><div class="sub" id="sub">waiting for a session</div></div>
 <form id="talk"><button type="button" id="mic">🎙 Hands-free</button><input id="txt" placeholder="Type to Friday, Enter to send" autocomplete="off"></form>
+<div id="micdiag" style="flex-basis:100%;font-size:13px;color:var(--dim)">Mic: off</div>
 <button id="stop">STOP</button></header>
 <main><div class="tiles" id="tiles"></div><div id="banner" hidden class="banner"></div>
 <section><h2>Packs: what Claude read and decided</h2><div id="packs"></div></section>
@@ -180,12 +184,22 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\bfriday
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,"").trim();let said="",hands=null;
 const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="friday"),s=new Set(norm(said).split(" "));
   return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
-if(!SR){mic.disabled=true;mic.title="No speech recognition in this browser: use Chrome, or type"}
+const MICERR={"not-allowed":"BLOCKED: allow the microphone for this page (lock icon in the address bar) and for Chrome in macOS Privacy & Security",
+ "service-not-allowed":"BLOCKED: open the page as http://127.0.0.1:8770 or localhost, not by IP address",
+ "network":"NETWORK: Chrome's speech recognition cannot reach Google from this Wi-Fi; try a phone hotspot",
+ "audio-capture":"NO MICROPHONE: check the input device in macOS Sound settings","no-speech":"no speech heard yet (still listening)",
+ "aborted":"stopped"};
+const diag=(m,bad)=>{const d=document.getElementById("micdiag");d.textContent="Mic: "+m;d.style.color=bad?"var(--expired)":"var(--dim)"};
+if(!window.isSecureContext)setTimeout(()=>diag("BLOCKED: this page is not on localhost/https, so Chrome refuses the microphone. Open http://127.0.0.1:8770.",true),0);
+if(!SR){setTimeout(()=>diag("this browser has no speech recognition: use Chrome",true),0);mic.disabled=true;mic.title="No speech recognition in this browser: use Chrome, or type"}
 else mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove("on");mic.textContent="🎙 Hands-free";return}
   const r=new SR();r.lang="en-US";r.continuous=true;r.interimResults=true;hands=r;
   mic.classList.add("on");mic.textContent='Listening: "Friday, ..."';
+  r.onerror=e=>{diag(MICERR[e.error]||("error: "+e.error),true)};
+  r.onstart=()=>diag("listening: say anything, the words appear here");
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
+    diag(`heard: "${t}"${WAKE.test(t)?(echo(t)?" (ignored: her own voice)":e.results[i].isFinal?" -> sent":""):" (no 'Friday': ignored)"}`);
     if(!WAKE.test(t)||echo(t))continue;
     if(!e.results[i].isFinal){fetch("/hush",{method:"POST"});continue}  // barge-in on the wake word
     send(t.slice(t.search(WAKE)).replace(WAKE,"").trim()||"yes?")}};
