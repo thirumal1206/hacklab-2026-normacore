@@ -11,7 +11,7 @@ RUNS="$ROOT/runs/agent"
 mkdir -p "$RUNS/candy-session" && cd "$RUNS/candy-session"
 MCP=$(printf '{"mcpServers":{"candy":{"command":"%s","args":["%s"],"env":{"CANDY_GO":"%s","CANDY_CAMERA":"%s","ARM_TTS":"%s","AGENT_PROFILE":"%s"}}}}' \
   "$ROOT/.venv/bin/python" "$ROOT/agent/candy_mcp.py" "${CANDY_GO:-0}" "${CANDY_CAMERA:-}" "${ARM_TTS:-say}" "${AGENT_PROFILE:-}")
-TOOLS=mcp__candy__spots,mcp__candy__pick,mcp__candy__say,mcp__candy__listen,mcp__candy__home,mcp__candy__session,mcp__candy__end,mcp__candy__grip
+TOOLS=mcp__candy__look,mcp__candy__spots,mcp__candy__pick,mcp__candy__say,mcp__candy__listen,mcp__candy__home,mcp__candy__session,mcp__candy__end,mcp__candy__grip
 SID=$(uuidgen | tr 'A-Z' 'a-z')
 rm -f "$RUNS/candy_end"
 printf '{"time": "%s", "event": "session", "id": "%s"}\n' "$(date +%H:%M:%S)" "$SID" >> "$RUNS/candy.jsonl"

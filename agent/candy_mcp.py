@@ -13,6 +13,8 @@ import candy  # noqa: E402
 S = {"type": "string"}
 GO = os.environ.get("CANDY_GO") == "1"
 TOOLS = {
+    "look": ("Camera photo of the whole table with every object numbered (c1, c2, ...): colour and whether it can be picked by "
+             "position (pickable). Look at the image to see what things really are (brand, type, shape) and where they lie.", {}, []),
     "spots": ("The taped crosses on the sheet where candies are placed: id (cross1, cross2, ...) and whether the arm can reach it.", {}, []),
     "pick": ("Pick the candies on the given crosses into one bin, one after another, fast: ids like [\"cross3\", \"cross4\"], "
              "or [\"all\"] for every reachable cross (an empty cross is skipped: the jaws close on nothing). People can talk during it: "
@@ -35,7 +37,15 @@ ears = None
 def run_tool(name, a):
     global ears
     content = []
-    if name == "spots":
+    if name == "look":
+        objs = candy.look()
+        out = {"objects": [{k: o[k] for k in ("id", "colour", "pickable") if k in o} | ({"x_cm": o["x_cm"], "y_cm": o["y_cm"]} if o.get("pickable") else {})
+                           for o in objs]}
+        if objs and not any(o.get("pickable") for o in objs):
+            out["note"] = "camera mapping not usable on this laptop: describe what you see, but pick only from the crosses (spots)"
+        import base64
+        content.append({"type": "image", "mimeType": "image/jpeg", "data": base64.b64encode((candy.RUNS / "candies.jpg").read_bytes()).decode()})
+    elif name == "spots":
         out = {"crosses": [{k: c[k] for k in ("id", "reachable")} for c in candy.spots()],
                "bins": [b["name"] for b in candy.real.cfg("motion.json")["poses"]["bins"]]}
     elif name == "pick":

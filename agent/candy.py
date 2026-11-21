@@ -98,6 +98,12 @@ def look(img=None):
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((k, k), np.uint8))
     n, lab, stats, cent = cv2.connectedComponentsWithStats(mask)
     area_px = wid * hgt / (320 * 240)
+    white = ((hsv[..., 2] > 150) & (hsv[..., 1] < 45)).astype(np.uint8)  # the sheet: the largest bright, grey-free region
+    wn, wlab, wst, _ = cv2.connectedComponentsWithStats(white)
+    sheet = None
+    if wn > 1:
+        big = 1 + int(np.argmax(wst[1:, 4]))
+        sheet = cv2.convexHull(np.column_stack(np.nonzero(wlab == big))[:, ::-1].astype(np.int32))
     reach = real.cfg("motion.json").get("candy", {}).get("reach_cm", {"x": [9, 30], "y": [-18, 18]})
     out = []
     for i in range(1, n):
@@ -105,16 +111,23 @@ def look(img=None):
         if not (6 * area_px <= a <= 900 * area_px):
             continue
         u, v = cent[i]
-        x, y = to_robot(u, v, wid)
+        if sheet is not None and cv2.pointPolygonTest(sheet, (float(u), float(v)), True) < 3:
+            continue  # not on the sheet: cables, laptops, people
+        obj = {"colour": colour(hsv[lab == i]), "px": [int(u), int(v)], "area": int(a), "pickable": False}
+        try:
+            x, y = to_robot(u, v, wid)
+        except RuntimeError:  # no usable camera mapping on this laptop: Friday can still see and describe it
+            out.append(obj)
+            continue
         if not (reach["x"][0] <= x <= reach["x"][1] and reach["y"][0] <= y <= reach["y"][1]):
             continue  # off the sheet, the arm itself, the bins
         pts = np.column_stack(np.nonzero(lab == i))[:, ::-1].astype(np.float32)
         (cu, cv), (w, h), ang = cv2.minAreaRect(pts)
         axis = np.deg2rad(ang if w >= h else ang + 90)  # long axis in the image
         x2, y2 = to_robot(u + 10 * np.cos(axis), v + 10 * np.sin(axis), wid)
-        out.append({"colour": colour(hsv[lab == i]), "x_cm": round(x, 1), "y_cm": round(y, 1),
-                    "angle": round(float(np.degrees(np.arctan2(y2 - y, x2 - x))), 0), "px": [int(u), int(v)], "area": int(a)})
-    out.sort(key=lambda c: (-c["x_cm"], c["y_cm"]))
+        out.append({**obj, "x_cm": round(x, 1), "y_cm": round(y, 1), "pickable": True,
+                    "angle": round(float(np.degrees(np.arctan2(y2 - y, x2 - x))), 0)})
+    out.sort(key=lambda c: (-c.get("x_cm", -c["px"][1]), c.get("y_cm", c["px"][0])))
     marked = img.copy()
     for k, c in enumerate(out, 1):
         c["id"] = f"c{k}"
