@@ -92,6 +92,15 @@
   "notes": [
     "Candidate boundary is the convex hull of ruler calibration points, not a verified reach boundary.",
     "Paper polygon was selected from an earlier frame and needs checking against current camera placement.",
-    "Execution flags require enforcement by the tools. Existing code does not consume this schema."
-  ]
+    "Execution flags require enforcement by the tools. Existing code does not consume this schema.",
+    "Generic contour candidates require validation against an empty scene; tape, markings and shadows may create false detections.",
+    "Reported dimensions assume the detected outline lies on the calibrated plane. Tall objects require height-aware geometry."
+  ],
+  "object_scope": "generic separated object candidates",
+  "detection": {
+    "min_area_px": 150,
+    "method": "edge_contours",
+    "height_source": null,
+    "gripper_max_opening_cm": null
+  }
 }
