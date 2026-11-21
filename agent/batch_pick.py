@@ -32,10 +32,10 @@ def parse(arg):
 CAMERA = os.environ.get("VISION_CAMERA", "835446b047547e89f1f2e588eedf268b")  # top camera queue id (changes on replug)
 # ADJUST if the paper moves: the white sheet in the 1280x960 frame, mug and box outside. As in Ash's profile, the detector
 # searches the whole sheet; outlines touching its border (mug, box, arm) are dropped by the detector itself.
-PAPER_PX = [(445, 336), (858, 333), (1150, 880), (200, 880)]
+PAPER_PX = [(445, 336), (812, 333), (1150, 880), (200, 880)]
 SCALE = 1.5  # Ash tuned the detector on 1920-wide frames; our frames are 1280 wide
 REACH_CM = (8.0, 24.0)  # distance from the base axis
-MAX_WIDTH_CM = 5.5  # jaws open about 5 cm; outlines come out about 1 cm wider than the object
+MAX_WIDTH_CM = 6.0  # jaws open about 5 cm; outlines come out about 1 cm wider than the object (wings fan out)
 LENGTH_CM = (1.5, 12.0)  # shorter: tape cross or speck; longer: the drawn arc line
 MIN_WIDTH_CM = 1.5  # thinner: a piece of the drawn arc line
 # ADJUST per object height: the mapping is fitted on the table, a candy top is ~2 cm higher and the camera looks at it
