@@ -3,7 +3,7 @@ no home in between. Positions are taken once (from one camera frame) and given o
 
     .venv/bin/python agent/batch_pick.py bin1 X,Y[,ANGLE] X,Y[,ANGLE] ...  [--go]      (cm, deg; default dry)
 
-Per object: open (only if the jaws are not open yet), hover, down, close, relief, up, bin drop, open.
+Per object: hover (jaws opening on the way), down, close, up, bin drop, open: 6 commands, time per command printed.
 Home once at the end. Speed/accel come from motion.json. STOP file (runs/agent/STOP) still stops before any move.
 """
 import sys
@@ -35,21 +35,27 @@ def main(argv):
     none = (0, range(0))  # no joint-jump guard: fast mode
     t0 = time.monotonic()
     for i, (x_cm, y_cm, angle) in enumerate(targets, 1):
-        t = time.monotonic()
+        t, times = time.monotonic(), []
+
+        def step(label, fn, *a, **k):  # run one command and note how long it took
+            s = time.monotonic()
+            out = fn(*a, **k)
+            times.append(f"{label} {time.monotonic() - s:.1f}")
+            return out
+
         x, y = x_cm / 100, y_cm / 100
         rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(angle, f))
-        if real.DRY or real.jaw_goal() < g["open"] - 0.05:
-            real.grip(g["open"])
-        real.free_move(x, y, hover, rpy, "hover", None, *none)
-        real.free_move(x, y, zg, rpy, "down", None, *none)
+        if not real.DRY:
+            real.set_jaw(g["open"])  # no separate open command: the hover move carries gripper = open
+        step("hover", real.free_move, x, y, hover, rpy, "hover", None, *none)
+        step("down", real.free_move, x, y, zg, rpy, "down", None, *none)
         at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, zg, *rpy)))
-        opening = real.grip(g["close"], settle=False, at=at)
-        if opening is not None and opening >= g["empty_below"]:
-            real.grip(max(opening - g.get("relief", 0.04), 0.0), at=at)
-        real.free_move(x, y, hover, rpy, "up", None, *none, loaded=True)
-        real.move(drop, f"{bin_name} drop", loaded=True)
-        real.grip(g["open"], at=drop)
-        print(f"{i}/{len(targets)} ({x_cm:.1f}, {y_cm:.1f}) cm -> {bin_name}  {time.monotonic() - t:.1f} s", flush=True)
+        step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
+        step("up", real.free_move, x, y, hover, rpy, "up", None, *none, loaded=True)
+        step("bin", real.move, drop, f"{bin_name} drop", loaded=True)
+        step("open", real.grip, g["open"], at=drop)
+        print(f"{i}/{len(targets)} ({x_cm:.1f}, {y_cm:.1f}) cm -> {bin_name}  {time.monotonic() - t:.1f} s   "
+              f"[{', '.join(times)}]", flush=True)
     real.home()
     print(f"done: {len(targets)} objects in {time.monotonic() - t0:.1f} s")
 
