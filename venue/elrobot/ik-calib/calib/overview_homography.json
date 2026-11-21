@@ -1,0 +1,30 @@
+{
+ "camera_id": "2e93ac9a84b60b296ca4e4dbd3195608",
+ "H_pixel_to_xy": [
+  [
+   -0.00020836391446296868,
+   -0.0021891021312029366,
+   2.4026913208071012
+  ],
+  [
+   -0.0027959219540513993,
+   0.0010549208162536636,
+   1.7007507634908623
+  ],
+  [
+   -0.0006511852877819656,
+   0.0062110293262995385,
+   1.0
+  ]
+ ],
+ "image_size": [
+  1280,
+  960
+ ],
+ "points": 11,
+ "rms_mm": 10.1,
+ "max_mm": 16.7,
+ "source": "logs/calib_overview_20261121_134751 (photos not committed)",
+ "time": "2026-11-21 13:53",
+ "z_note": "fitted with the jaw tips touching the table, pixel -> commanded x, y"
+}
