@@ -1,0 +1,7 @@
+{
+  "_owner": "Agent + team",
+  "_help": "Every product that may appear. A code not listed here is 'unknown' and can never go to Stock.",
+  "products": [
+    {"code": "EXAMPLE-0001", "name": "Example tablets 20 pcs", "width_cm": null, "depth_cm": null, "height_cm": null, "fragile": false}
+  ]
+}

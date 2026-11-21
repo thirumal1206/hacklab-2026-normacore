@@ -1,0 +1,15 @@
+{
+  "_owner": "Vision",
+  "_help": "How scan() sees packs. Fill with values measured on the real mat and lighting.",
+  "camera_settings": {"focus": null, "exposure": null, "white_balance": null, "locked": false},
+  "background_image": null,
+  "pack_detection": {"min_area_px": null, "max_area_px": null, "seconds_per_scan": null},
+  "code_reading": {
+    "symbology": null,
+    "camera": "gripper or top",
+    "read_rate_measured": null,
+    "fallback": "label crop to Claude via inspect()"
+  },
+  "pack_height_classes_cm": {"flat_max": null, "normal_max": null},
+  "verify_place": {"method": null, "seconds": null}
+}

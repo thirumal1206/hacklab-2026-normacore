@@ -13,6 +13,7 @@ The LLM supervises: it chooses targets (numbered marks from `locate`), plans, ve
 |---|---|
 | `arm.py` | The whole runtime: daemon (`serve`), CLI client, backends (`SimBackend` MuJoCo, `StationBackend` TCP 8888), skills (pick/place/push/gesture/taught grid), perception (`look`, `locate`, `snap`), live view (`view`), voice (`say`, `listen`), `bringup`, `selfcheck` |
 | `mcp_server.py` | Stdlib MCP server exposing the same commands as tools (images inline) |
+| `agent/config/` | Templates the team fills in: workspace, motion, vision, catalog, rules (read by the agent tools) |
 | `operator/` | What the robot-driving agent reads (`AGENTS.md`) and its `.mcp.json` |
 | `elrobot/` | ElRobot URDF, meshes, IK (`ik.py`), kinematics check (`check.py`) |
 | `so101-sim/` | MuJoCo SO-101 tabletop scenes: `so101_tabletop.xml` (cubes), `_objects` (pen, cup, eraser, tape), `_pencil` |

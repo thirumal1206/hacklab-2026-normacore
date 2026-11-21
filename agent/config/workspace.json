@@ -1,0 +1,46 @@
+{
+  "_owner": "Environment",
+  "_units": "cm in the robot base frame: x forward, y left, z up, table = 0. Angles in degrees.",
+  "table_z_cm": 0.0,
+  "reach": {
+    "_help": "Where IK solves AND the shoulder holds a loaded arm. Measure by driving the tip there; do not guess.",
+    "min_x_cm": 13.0,
+    "max_x_cm": 20.0,
+    "max_abs_y_cm": 12.0
+  },
+  "input_zone": {
+    "_help": "Rectangle where packs arrive. scan() only reports packs inside it.",
+    "x_min_cm": null,
+    "x_max_cm": null,
+    "y_min_cm": null,
+    "y_max_cm": null
+  },
+  "no_go_zones": [
+    {"_help": "Rectangles the arm must never enter (camera stand, cables, lamps).", "name": "camera stand", "x_min_cm": null, "x_max_cm": null, "y_min_cm": null, "y_max_cm": null}
+  ],
+  "bins": [
+    {"name": "Stock", "x_cm": null, "y_cm": null, "top_z_cm": null, "inner_w_cm": null, "inner_d_cm": null, "capacity": null, "reach_tested": false},
+    {"name": "Expired", "x_cm": null, "y_cm": null, "top_z_cm": null, "inner_w_cm": null, "inner_d_cm": null, "capacity": null, "reach_tested": false},
+    {"name": "Recall", "x_cm": null, "y_cm": null, "top_z_cm": null, "inner_w_cm": null, "inner_d_cm": null, "capacity": null, "reach_tested": false},
+    {"name": "Manual check", "x_cm": null, "y_cm": null, "top_z_cm": null, "inner_w_cm": null, "inner_d_cm": null, "capacity": null, "reach_tested": false}
+  ],
+  "cameras": {
+    "_help": "Station camera queue ids (GET /api/v1/cameras). They change when a camera is replugged.",
+    "top_id": null,
+    "gripper_id": null,
+    "top_resolution": [null, null]
+  },
+  "calibration": {
+    "_help": "Pixel -> table homography from touch points. Fit at box-top height if packs are tall.",
+    "homography_file": "venue/elrobot/ik-calib/calib/overview_homography.json",
+    "fitted_at_z_cm": null,
+    "rms_mm": null,
+    "max_mm": null,
+    "points_used": null
+  },
+  "bump_markers": {
+    "_help": "Fixed markers (e.g. corner crosses). Their pixel positions at calibration time; if one moves more than tolerance_px, every tool stops with 'recalibrate'.",
+    "tolerance_px": 4,
+    "markers": [{"name": "corner_tl", "u": null, "v": null}]
+  }
+}

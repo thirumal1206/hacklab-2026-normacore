@@ -1,0 +1,36 @@
+{
+  "_owner": "Motion",
+  "_units": "cm, degrees, servo speed/accel as Station takes them. Poses are taught (leader arm or by hand), stored as motor steps 1-8.",
+  "follower_bus": "5B79016927",
+  "poses": {
+    "_help": "steps = [m1..m8] read from GET /api/v1/arms after placing the arm there.",
+    "home": {"steps": null, "tip_cm": [null, null, null]},
+    "hover_z_cm": null,
+    "bins": {
+      "Stock": {"drop_steps": null, "tip_cm": [null, null, null]},
+      "Expired": {"drop_steps": null, "tip_cm": [null, null, null]},
+      "Recall": {"drop_steps": null, "tip_cm": [null, null, null]},
+      "Manual check": {"drop_steps": null, "tip_cm": [null, null, null]}
+    }
+  },
+  "grasp": {
+    "_help": "Grasp tip height above the table per pack height class, measured on real packs.",
+    "z_by_height_cm": {"flat": null, "normal": null, "tall": null},
+    "open": null,
+    "stall_means_holding_below": null,
+    "max_pack_width_cm": null,
+    "retries": 1
+  },
+  "speed": {
+    "empty": {"speed": null, "accel": null},
+    "loaded": {"speed": null, "accel": null}
+  },
+  "measured": {
+    "_help": "Fill from real runs: picks tried, held, placed, seconds per pick.",
+    "picks_tried": 0,
+    "picks_held": 0,
+    "places_ok": 0,
+    "seconds_per_pick": null,
+    "shoulder_sag_mm": null
+  }
+}
