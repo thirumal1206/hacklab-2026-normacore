@@ -3,9 +3,10 @@
     .venv/bin/python agent/report.py            # markdown to stdout (paste into the team chat or the changelog)
 """
 import json
+import os
 from pathlib import Path
 
-RUNS = Path(__file__).resolve().parent.parent / "runs" / "agent"
+RUNS = Path(os.environ.get("AGENT_RUNS_DIR", Path(__file__).resolve().parent.parent / "runs" / "agent"))
 FAR_MM = 10  # a move that ends further than this from its target is worth a look
 
 

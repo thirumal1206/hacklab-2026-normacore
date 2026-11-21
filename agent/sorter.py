@@ -14,7 +14,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 ROOT = HERE.parent
 CONFIG = Path(os.environ.get("AGENT_CONFIG_DIR", HERE / "config"))
-RUNS = ROOT / "runs" / "agent"
+RUNS = Path(os.environ.get("AGENT_RUNS_DIR", ROOT / "runs" / "agent"))
 
 
 STOP = RUNS / "STOP"  # touch it to freeze every acting tool
@@ -86,6 +86,7 @@ class FakeBackend:
         return [dict(p) for p in self.table.values()]
 
     def crop(self, pack_id):
+        self.steps("read", pack_id)
         import cv2
         import numpy as np
 
@@ -102,10 +103,28 @@ class FakeBackend:
         cv2.imwrite(str(path), img)
         return str(path)
 
+    def steps(self, seq, pack, bin_name=None):
+        """Log the sequence's step names like real.py does (no positions: nothing is measured), paced for the dashboard."""
+        import real
+
+        real.CONTEXT.update(pack=pack, seq=seq)
+        m = json.loads((CONFIG / "motion.json").read_text())
+        for st in m["sequences"][seq]:
+            if st.startswith("wait:"):
+                continue
+            label = f"{pack} {st[5:]}" if st.startswith("slot.") else f"{bin_name} {st[4:]}" if st.startswith("bin.") else st
+            real.log(step=label, kind="grip" if st in ("open", "close") else "photo" if st == "photo" else "move", fake=True)
+            time.sleep(float(os.environ.get("AGENT_FAKE_STEP_S", "0.25")))
+
     def pick(self, x_cm, y_cm, angle, height_class):
+        pack = min(self.table.values(), key=lambda p: (p["x_cm"] - x_cm) ** 2 + (p["y_cm"] - y_cm) ** 2)["id"]
+        self.steps("pick", pack)
         return {"holding": self.rng.random() > 0.15, "reason": "fake grasp"}
 
     def place(self, bin_name):
+        import real
+
+        self.steps("place", real.CONTEXT["pack"], bin_name)
         return {"placed": True, "reason": "fake place"}
 
     def verify_place(self, pack_id, bin_name):
@@ -113,6 +132,10 @@ class FakeBackend:
         return {"ok": True, "photo": None}
 
     def home(self):
+        import real
+
+        real.CONTEXT["seq"] = "home"
+        real.log(step="home", kind="move", fake=True)
         return {"ok": True}
 
     def camera_bumped(self):

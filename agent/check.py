@@ -1,7 +1,13 @@
 """Agent tools without hardware: vetoes, a full fake batch, and the MCP round trip. Exit 1 on failure."""
 import json
+import os
 import subprocess
 import sys
+
+os.environ.setdefault("AGENT_FAKE_STEP_S", "0")
+import tempfile  # noqa: E402
+
+os.environ["AGENT_RUNS_DIR"] = tempfile.mkdtemp()  # never write into the live dashboard's logs
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))

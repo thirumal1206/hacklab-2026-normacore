@@ -13,7 +13,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 TMP = Path(tempfile.mkdtemp())
-(HERE.parent / "runs" / "agent" / "motion.jsonl").unlink(missing_ok=True)
+os.environ["AGENT_RUNS_DIR"] = str(TMP / "runs")  # never write into the live dashboard's logs
 shutil.copytree(HERE / "config", TMP / "config")
 os.environ["AGENT_CONFIG_DIR"] = str(TMP / "config")
 os.environ["AGENT_BACKEND"] = "real"

@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CONFIG = Path(os.environ.get("AGENT_CONFIG_DIR", HERE / "config"))
-RUNS = HERE.parent / "runs" / "agent"
+RUNS = Path(os.environ.get("AGENT_RUNS_DIR", HERE.parent / "runs" / "agent"))
 STOP = RUNS / "STOP"
 
 

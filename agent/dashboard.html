@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friday Pack Sorter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky control bar, KPI strip, then a two-column console: the Now stage and bin board on the left,
+   conversation and table map on the right, diagnostics in tabs underneath. Clinical pharmacy look. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --sunken:#eef1f5; --line:#dde2ea; --ink:#14213a; --muted:#5d6b82;
+  --accent:#0d8a6a; --accent-soft:#dff3ec; --ok:#12805c; --bad:#c2362f; --bad-soft:#fbe7e5; --warn:#b26b00; --warn-soft:#fdf1dc;
+  --b1:#0d8a6a; --b2:#2f6fd6; --b3:#b26b00; --b4:#7a52c7; --flag:#6b7486;
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:12px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e131b; --surface:#151c27; --sunken:#111720; --line:#253041; --ink:#e7edf6; --muted:#8e9bb0;
+  --accent:#3ccf9e; --accent-soft:#12322a; --ok:#3ccf9e; --bad:#ff6b61; --bad-soft:#3a1716; --warn:#f0b44c; --warn-soft:#3a2b12;
+  --b1:#3ccf9e; --b2:#6ea2ff; --b3:#f0b44c; --b4:#b195f2; --flag:#8e9bb0; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+/* control bar */
+.bar{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1500px;margin:0 auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:12px;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
+.mark svg{width:16px;height:16px}
+.brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.1px}
+.brand .meta{font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-weight:600;font-size:13px;background:var(--sunken)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.run{background:var(--accent-soft);color:var(--ok)} .pill.run i{background:var(--ok);animation:pulse 1.4s infinite}
+.pill.stop{background:var(--bad-soft);color:var(--bad)} .pill.stop i{background:var(--bad)}
+@keyframes pulse{50%{opacity:.35}}
+.talk{margin-left:auto;display:flex;gap:8px;flex:1;max-width:560px;min-width:260px}
+.talk input{flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunken)}
+.btn{padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.stop{padding:10px 22px;border-radius:10px;border:0;background:var(--bad);color:#fff;font-weight:700;letter-spacing:.6px;cursor:pointer}
+.stop.resume{background:var(--ok)}
+
+main{max-width:1500px;margin:0 auto;display:grid;gap:16px;padding-block:16px 40px;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.banner{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad);border-radius:var(--r);padding:12px 16px;font-weight:600}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.kpi .v{font:600 30px/1.15 var(--mono);margin-top:4px}
+.kpi .s{font-size:12px;color:var(--muted)}
+.prog{height:6px;border-radius:3px;background:var(--sunken);margin-top:8px;overflow:hidden}.prog b{display:block;height:100%;background:var(--accent);transition:width .4s}
+
+.cols{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:16px;align-items:start}
+.stack{display:grid;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card h2{font-size:12px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+
+/* Now stage */
+.now{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:20px;align-items:start}
+.shot{aspect-ratio:7/3;max-width:100%;border-radius:10px;background:var(--sunken);display:grid;place-items:center;overflow:hidden;border:1px solid var(--line)}
+.shot img{width:100%;height:100%;object-fit:cover}
+.shot span{color:var(--muted);font-size:13px;padding:12px;text-align:center}
+.doing{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.read{font:600 28px/1.2 var(--mono);margin:6px 0 10px;text-wrap:balance;overflow-wrap:anywhere}
+.decision{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px}
+.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-weight:600;font-size:12.5px;color:#fff;background:var(--c,var(--muted))}
+.veto{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600;font-size:13px}
+.steps{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+.step{padding:5px 10px;border-radius:8px;font:500 12px var(--mono);background:var(--sunken);color:var(--muted);border:1px solid transparent}
+.step.done{background:var(--accent-soft);color:var(--ok)}
+.step.cur{border-color:var(--accent);color:var(--ink);background:var(--surface)}
+
+/* bins board */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.bin{border:1px solid var(--line);border-radius:10px;background:var(--sunken);min-height:150px;display:flex;flex-direction:column}
+.bin header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:3px solid var(--c);font-weight:600}
+.bin header .n{font:600 18px var(--mono)}
+.bin ul{list-style:none;margin:0;padding:8px;display:grid;gap:6px}
+.pk{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px}
+.pk img,.pk .ph{width:44px;height:28px;border-radius:4px;object-fit:cover;background:var(--sunken)}
+.pk b{display:block;font-size:12.5px;line-height:1.25;overflow-wrap:anywhere}
+.pk small{color:var(--muted);font-size:11.5px}
+.empty{color:var(--muted);font-size:13px;padding:10px 12px}
+
+/* conversation */
+.chat{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;padding-right:4px}
+.msg{max-width:88%;padding:8px 12px;border-radius:12px;font-size:14px}
+.msg.you{align-self:flex-end;background:var(--sunken);border-bottom-right-radius:4px}
+.msg.fri{align-self:flex-start;background:var(--accent-soft);border-bottom-left-radius:4px}
+.msg small{display:block;font-size:11px;color:var(--muted)}
+.speaking{font-size:12px;color:var(--ok);font-weight:600}
+
+/* map */
+.map svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+/* tabs + tables */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 12px}
+.tab{padding:8px 12px;border:0;background:none;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.scroll{overflow:auto;max-height:420px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;position:sticky;top:0;background:var(--surface)}
+td{padding:7px 8px;border-top:1px solid var(--line);vertical-align:top}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.res-bad{color:var(--bad);font-weight:600}.res-warn{color:var(--warn);font-weight:600}.res-ok{color:var(--ok)}
+.log{display:grid;gap:6px}
+.ev{display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;padding:8px 10px;border-radius:8px;background:var(--sunken);font-size:13px}
+.ev.v{background:var(--warn-soft)}
+.ev time{color:var(--muted);font-family:var(--mono);font-size:12px}
+
+@media (max-width:1000px){.cols{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.now{grid-template-columns:1fr}.talk{min-width:0;max-width:none;flex-basis:100%}.read{font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="bar"><div class="bar-in">
+  <div class="brand">
+    <div class="mark"><svg viewBox="0 0 16 16"><path d="M6 1h4v5h5v4h-5v5H6v-5H1V6h5z" fill="#fff"/></svg></div>
+    <div><h1>Friday Pack Sorter</h1><div class="meta" id="meta">waiting for a session</div></div>
+  </div>
+  <span class="pill" id="pill"><i></i><span id="pilltxt">Idle</span></span>
+  <form class="talk" id="talk"><button type="button" class="btn" id="mic">Hands-free</button><input id="txt" placeholder="Type to Friday, Enter to send" autocomplete="off"></form>
+  <button class="stop" id="stop">STOP</button>
+</div></div>
+
+<main>
+  <div class="banner" id="banner" hidden>Stopped by a person. Every tool refuses until you press RESUME.</div>
+  <section class="kpis">
+    <div class="kpi"><div class="l">Packs done</div><div class="v" id="k-done">0 / 0</div><div class="prog"><b id="k-prog" style="width:0"></b></div></div>
+    <div class="kpi"><div class="l">Code corrected Claude</div><div class="v" id="k-veto">0</div><div class="s">vetoes: wrong bin refused</div></div>
+    <div class="kpi"><div class="l">Time per pack</div><div class="v" id="k-time">–</div><div class="s">arm moves, average</div></div>
+    <div class="kpi"><div class="l">Arm accuracy</div><div class="v" id="k-acc">–</div><div class="s">worst move vs its target</div></div>
+  </section>
+
+  <div class="cols">
+    <div class="stack">
+      <section class="card">
+        <h2><span>Now</span><span id="now-pack"></span></h2>
+        <div class="now">
+          <div class="shot" id="shot"><span>The wrist close-up appears here when Friday reads a pack.</span></div>
+          <div>
+            <div class="doing" id="doing">Waiting</div>
+            <div class="read" id="readname">–</div>
+            <div class="decision" id="decision"></div>
+            <div class="veto" id="vetobox" hidden></div>
+            <div class="steps" id="steps"></div>
+          </div>
+        </div>
+      </section>
+      <section class="card"><h2><span>Bins</span><span id="bins-meta"></span></h2><div class="board" id="board"></div></section>
+    </div>
+    <div class="stack">
+      <section class="card"><h2><span>Conversation</span><span class="speaking" id="speaking" hidden>Friday is speaking</span></h2>
+        <div class="chat" id="chat"><div class="empty">Say "Friday, sort the table" with Hands-free on, or type above.</div></div></section>
+      <section class="card map"><h2><span>Table, seen from above</span><span class="mono" id="tip"></span></h2>
+        <div id="map"></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>pack waiting</span><span><i style="background:var(--line)"></i>slot empty</span><span><i style="background:var(--b2)"></i>bin</span><span><i style="background:var(--bad)"></i>gripper</span></div></section>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-t="arm">Arm steps</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="log">Decisions</button>
+    </div>
+    <div id="t-arm" class="scroll"></div>
+    <div id="t-log" class="scroll" hidden></div>
+  </section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const BINC=["var(--b1)","var(--b2)","var(--b3)","var(--b4)"];
+let binColor={},stopped=false,said="",hands=null;
+const chip=b=>b?`<span class="chip" style="--c:${binColor[b]||"var(--flag)"}">${esc(b)}</span>`:"";
+const img=f=>f?`/img/${encodeURIComponent(f.split("/").pop())}`:"";
+
+$("stop").onclick=async()=>{await fetch(stopped?"/resume":"/stop",{method:"POST"});tick()};
+for(const t of document.querySelectorAll(".tab"))t.onclick=()=>{for(const u of document.querySelectorAll(".tab")){u.setAttribute("aria-selected",u===t);$("t-"+u.dataset.t).hidden=u!==t}};
+const send=t=>t&&fetch("/heard",{method:"POST",body:JSON.stringify({text:t})}).then(tick);
+$("talk").onsubmit=e=>{e.preventDefault();send($("txt").value.trim());$("txt").value=""};
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\bfriday\b[\s,.!?]*/i,mic=$("mic");
+const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,"").trim();
+const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="friday"),s=new Set(norm(said).split(" "));
+  return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
+if(!SR){mic.disabled=true;mic.title="Speech recognition needs Chrome; type instead"}
+else mic.onclick=()=>{
+  if(hands){const h=hands;hands=null;h.stop();mic.classList.remove("on");mic.textContent="Hands-free";return}
+  const r=new SR();r.lang="en-US";r.continuous=true;r.interimResults=true;hands=r;mic.classList.add("on");mic.textContent='Listening for "Friday"';
+  r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
+    if(!WAKE.test(t)||echo(t))continue;
+    if(!e.results[i].isFinal){fetch("/hush",{method:"POST"});continue}
+    send(t.slice(t.search(WAKE)).replace(WAKE,"").trim()||"yes?")}};
+  r.onend=()=>{if(hands===r)r.start()};r.start()};
+
+function stepLabelMatches(st,row,pack,bin){
+  if(st==="home"||st==="open"||st==="close"||st==="photo")return row.step===st;
+  const pose=st.split(".")[1];return row.step.endsWith(" "+pose);
+}
+function tracker(lay,motion){
+  const last=motion[motion.length-1];if(!last||!lay.sequences)return "";
+  const seq=lay.sequences[last.seq];if(!seq)return "";
+  let run=[];for(let i=motion.length-1;i>=0;i--){const r=motion[i];if(r.seq!==last.seq||r.pack!==last.pack)break;run.unshift(r)}
+  const steps=seq.filter(s=>!s.startsWith("wait:"));let k=0;
+  for(const r of run)if(k<steps.length&&stepLabelMatches(steps[k],r))k++;
+  return `<span class="muted" style="font-size:12px;align-self:center;margin-right:4px">${esc(last.seq)}</span>`+
+    steps.map((s,i)=>`<span class="step ${i<k?"done":i===k?"cur":""}">${esc(s.replace("slot.","").replace("bin.","bin "))}</span>`).join("");
+}
+
+function map(lay,scan,last,motion){
+  const slots=(lay.slots||[]).filter(s=>s.x!=null);
+  const packs=(scan.packs||[]).map(p=>({name:p.id,x:p.x_cm,y:p.y_cm}));
+  const pts=slots.length?slots:packs, bins=(lay.bins||[]).filter(b=>b.x!=null);
+  const all=[...pts,...bins,{x:0,y:0}];
+  const maxX=Math.max(25,...all.map(p=>p.x+4)),maxY=Math.max(15,maxX*0.8,...all.map(p=>Math.abs(p.y)+4));  // keeps the map wider than tall
+  const W=320,H=Math.round(W*maxX/(2*maxY)),sx=y=>W/2-y/maxY*W/2,sy=x=>H-12-x/maxX*(H-24);
+  const filled=new Set((scan.packs||[]).filter(p=>!last[p.id]||!(last[p.id].verified||last[p.id].flagged)).map(p=>p.id));
+  const r=lay.reach||{},band=r.min_x_cm&&r.max_x_cm?`<path d="M${sx(-r.max_x_cm)},${sy(0)} A${r.max_x_cm/maxY*W/2},${(r.max_x_cm/maxX)*(H-24)} 0 0 1 ${sx(r.max_x_cm)},${sy(0)} L${sx(r.min_x_cm)},${sy(0)} A${r.min_x_cm/maxY*W/2},${(r.min_x_cm/maxX)*(H-24)} 0 0 0 ${sx(-r.min_x_cm)},${sy(0)} Z" fill="var(--accent-soft)" opacity=".6"/>`:"";
+  const tipRow=[...motion].reverse().find(m=>m.reached_cm);const tip=tipRow&&tipRow.reached_cm;
+  $("tip").textContent=tip?`gripper ${tip.x}, ${tip.y}, ${tip.z} cm`:"";
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Table map">
+    <rect x="0" y="0" width="${W}" height="${H}" rx="8" fill="var(--sunken)"/>${band}
+    ${pts.map(p=>`<g><rect x="${sx(p.y)-13}" y="${sy(p.x)-8}" width="26" height="16" rx="3" fill="${filled.has(p.name)?"var(--accent)":"var(--surface)"}" stroke="var(--line)"/>
+      <text x="${sx(p.y)}" y="${sy(p.x)+3.5}" font-size="9" font-weight="600" text-anchor="middle" fill="${filled.has(p.name)?"#fff":"var(--muted)"}" font-family="IBM Plex Mono,monospace">${esc(p.name)}</text></g>`).join("")}
+    ${bins.map(b=>`<g><rect x="${sx(b.y)-14}" y="${sy(b.x)-14}" width="28" height="28" rx="4" fill="none" stroke="${binColor[b.name]||"var(--b2)"}" stroke-width="2"/>
+      <text x="${sx(b.y)}" y="${sy(b.x)+26}" font-size="9" text-anchor="middle" fill="var(--muted)">${esc(b.name)}</text></g>`).join("")}
+    <circle cx="${sx(0)}" cy="${sy(0)}" r="9" fill="var(--ink)"/><text x="${sx(0)}" y="${sy(0)-14}" font-size="9" text-anchor="middle" fill="var(--muted)">arm base</text>
+    ${tip?`<line x1="${sx(0)}" y1="${sy(0)}" x2="${sx(tip.y)}" y2="${sy(tip.x)}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="3 3"/><circle cx="${sx(tip.y)}" cy="${sy(tip.x)}" r="6" fill="var(--bad)"/>`:""}
+  </svg>`;
+}
+
+function armTable(motion){
+  if(!motion.length)return `<div class="empty">No arm steps yet.</div>`;
+  const f=v=>v?`${v.x}, ${v.y}, ${v.z}`:"";
+  return `<table><tr><th>Time</th><th>Pack</th><th>Step</th><th>Asked (cm)</th><th>Reached (cm)</th><th>Off</th><th>Took</th><th>Result</th></tr>`+
+    motion.slice().reverse().slice(0,150).map(r=>{const bad=/refused|stopped|not taught|nothing/.test(r.result||""),warn=r.off_mm>10;
+      const res=r.result||(r.kind==="grip"&&r.opening!=null?`opening ${r.opening}`:r.kind==="photo"?"photo taken":r.fake?"simulated":r.status||"");
+      return `<tr><td class="num muted">${esc((r.time||"").slice(11))}</td><td>${esc(r.pack||"")}<div class="muted" style="font-size:11.5px">${esc(r.seq||"")}</div></td>
+      <td><b>${esc(r.step)}</b>${r.loaded?' <span class="muted">· carrying</span>':""}</td><td class="num">${f(r.target_cm)}</td><td class="num">${f(r.reached_cm)}</td>
+      <td class="num ${warn?"res-warn":""}">${r.off_mm!=null?r.off_mm+" mm":""}</td><td class="num">${r.seconds!=null?r.seconds+" s":""}</td>
+      <td class="${bad?"res-bad":warn?"res-warn":"res-ok"}">${esc(res)}</td></tr>`}).join("")+"</table>"}
+
+function logLine(r){
+  if(r.event==="scan")return `Scanned the table: ${r.packs} packs`;
+  if(r.event==="inspect")return `Took a close-up of <b>${esc(r.id)}</b>`;
+  if(r.event==="say")return `Friday: ${esc(r.text)}`;
+  if(r.event==="heard")return `You: ${esc(r.text)}`;
+  if(r.flagged)return `Left <b>${esc(r.id)}</b> for a person: ${esc(r.reason)}`;
+  if(r.expected)return `Claude chose ${chip(r.bin)} for <b>${esc(r.id)}</b>. Code refused: ${esc(r.refused)}. Correct bin ${chip(r.expected)}`;
+  if(r.refused)return `<b>${esc(r.id)}</b>: ${esc(r.refused)}`;
+  if(r.dry_run)return `Plan: ${esc(r.id)} to ${chip(r.bin)} (dry run, nothing moved)`;
+  if(r.bin)return `<b>${esc(r.read_name||r.product||r.id)}</b> to ${chip(r.bin)} ${r.verified?"verified":"not verified"} <span class="muted">${esc(r.reason||"")}</span>`;
+  return null}
+
+async function tick(){
+  let s;try{s=await (await fetch("/state")).json()}catch(e){$("pilltxt").textContent="Dashboard offline";return}
+  const lay=s.layout||{},scan=s.scan||{packs:[],bins:[]},ev=s.events||[],motion=s.motion||[];
+  (scan.bins||[]).forEach((b,i)=>binColor[b]=b==="Unknown"?"var(--flag)":BINC[i%4]);
+  said=s.said||"";stopped=s.stopped;
+  $("stop").textContent=stopped?"RESUME":"STOP";$("stop").className="stop"+(stopped?" resume":"");$("banner").hidden=!stopped;
+  const ss=s.session;$("meta").textContent=ss?`${ss.backend==="real"?"Real arm":"Simulated arm"}${ss.dry_run?" · dry run":""} · started ${ss.time.slice(11,16)}`:"waiting for a session";
+
+  const last={},crops={};let vetoes=0;
+  for(const r of ev){if(r.event==="inspect"&&r.image)crops[r.id]=r.image;if(!r.id||r.event)continue;if(r.expected)vetoes++;last[r.id]=r}
+  const packs=scan.packs||[],done=packs.filter(p=>last[p.id]&&(last[p.id].verified||last[p.id].flagged)).length;
+  $("k-done").textContent=`${done} / ${packs.length}`;$("k-prog").style.width=(packs.length?100*done/packs.length:0)+"%";
+  $("k-veto").textContent=vetoes;
+  const mv=motion.filter(m=>m.kind==="move"&&m.seconds!=null),byPack={};
+  for(const m of mv)byPack[m.pack]=(byPack[m.pack]||0)+m.seconds;
+  const pt=Object.values(byPack);$("k-time").textContent=pt.length?(pt.reduce((a,b)=>a+b,0)/pt.length).toFixed(1)+" s":"–";
+  const off=mv.filter(m=>m.off_mm!=null).map(m=>m.off_mm);$("k-acc").textContent=off.length?Math.max(...off)+" mm":"–";
+
+  const lastEv=ev[ev.length-1],lastM=motion[motion.length-1];
+  const age=t=>t?(Date.now()-new Date(t).getTime())/1000:1e9;
+  const moving=lastM&&age(lastM.time)<4&&["read","pick","place"].includes(lastM.seq);
+  const pill=$("pill");
+  if(stopped){pill.className="pill stop";$("pilltxt").textContent="Stopped"}
+  else if(moving){pill.className="pill run";$("pilltxt").textContent="Arm moving"}
+  else if(lastEv&&age(lastEv.time)<10){pill.className="pill run";$("pilltxt").textContent="Working"}
+  else{pill.className="pill";$("pilltxt").textContent=ss?"Listening":"Idle"}
+  $("speaking").hidden=!s.speaking;
+
+  // Now stage: the most recent pack Claude touched
+  const focus=[...ev].reverse().find(r=>r.id&&(r.event==="inspect"||!r.event));
+  if(focus){
+    const r=last[focus.id],pid=focus.id;$("now-pack").textContent=pid;
+    $("shot").innerHTML=crops[pid]?`<img src="${img(crops[pid])}" alt="Close-up of ${esc(pid)}">`:`<span>No close-up for ${esc(pid)}</span>`;
+    const verb=moving?(lastM.seq==="read"?"Reading the label":lastM.seq==="pick"?"Picking up":lastM.seq==="place"?"Placing":"Moving"):
+      !r?"Reading the label":r.verified?"Placed and checked":r.flagged?"Left for a person":r.expected?"Code corrected the bin":r.dry_run?"Planned (dry run)":"Done";
+    $("doing").textContent=verb;
+    $("readname").textContent=r&&r.read_name?r.read_name:r&&r.product?r.product:(r?"Name unreadable":"Reading…");
+    $("decision").innerHTML=r?`${r.bin?"Bin "+chip(r.bin):""} ${r.product&&r.read_name?`<span class="muted">matches ${esc(r.product)}</span>`:""}`:"";
+    const v=[...ev].reverse().find(x=>x.id===pid&&x.expected);
+    $("vetobox").hidden=!v;if(v)$("vetobox").textContent=`Claude chose ${v.bin}. Code refused: ${v.refused}. Correct bin: ${v.expected}.`;
+  }
+  $("steps").innerHTML=tracker(lay,motion);
+
+  // bins board
+  const cols=[...(scan.bins||[]),"Flagged"];
+  $("bins-meta").textContent=scan.mode==="name_only"?"sorted by the name Claude read":"";
+  $("board").innerHTML=cols.map(b=>{const items=Object.values(last).filter(r=>b==="Flagged"?r.flagged:r.verified&&r.bin===b);
+    return `<div class="bin" style="--c:${b==="Flagged"?"var(--flag)":binColor[b]}"><header><span>${esc(b)}</span><span class="n">${items.length}</span></header>
+    ${items.length?`<ul>${items.map(r=>`<li class="pk">${crops[r.id]?`<img src="${img(crops[r.id])}" alt="">`:`<span class="ph"></span>`}
+      <span><b>${esc(r.read_name||r.product||r.id)}</b><small>${esc(r.id)}${b==="Flagged"?" · "+esc(r.reason):""}</small></span></li>`).join("")}</ul>`:`<div class="empty">Empty</div>`}</div>`}).join("");
+
+  // conversation
+  const talk=ev.filter(r=>r.event==="heard"||r.event==="say");
+  if(talk.length){const c=$("chat"),stick=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
+    c.innerHTML=talk.map(r=>`<div class="msg ${r.event==="say"?"fri":"you"}"><small>${r.event==="say"?"Friday":"You"} · ${esc((r.time||"").slice(11,16))}</small>${esc(r.text)}</div>`).join("");
+    if(stick)c.scrollTop=c.scrollHeight}
+
+  $("map").innerHTML=map(lay,scan,last,motion);
+  $("t-arm").innerHTML=armTable(motion);
+  const lines=ev.slice().reverse().map(r=>{const h=logLine(r);return h?`<div class="ev${r.expected?" v":""}"><time>${esc((r.time||"").slice(11))}</time><div>${h}</div></div>`:""}).join("");
+  $("t-log").innerHTML=`<div class="log">${lines||'<div class="empty">Nothing yet.</div>'}</div>`;
+}
+tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
