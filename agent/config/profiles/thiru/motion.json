@@ -1,0 +1,157 @@
+{
+  "_owner": "Motion",
+  "_units": "cm, degrees, servo speed/accel as Station takes them. Poses are taught (leader arm or by hand), stored as motor steps 1-8.",
+  "follower_bus": "5B79016927",
+  "poses": {
+    "_help": "Taught pose: x, y, z (m), roll, pitch, yaw (rad), steps (motor 1-8). Written by agent/teach.py, never typed by hand.",
+    "home": {
+      "x": 0.0473,
+      "y": 0.0075,
+      "z": 0.4929,
+      "roll": 1.4166,
+      "pitch": -0.4043,
+      "yaw": -2.4903,
+      "steps": [
+        2254,
+        2017,
+        1351,
+        2078,
+        2006,
+        2079,
+        3054,
+        2830
+      ]
+    },
+    "slots": [
+      {
+        "name": "slot1",
+        "hover": null,
+        "grip": null,
+        "read": null
+      },
+      {
+        "name": "slot2",
+        "hover": null,
+        "grip": null,
+        "read": null
+      },
+      {
+        "name": "slot3",
+        "hover": null,
+        "grip": null,
+        "read": null
+      }
+    ],
+    "bins": [
+      {
+        "name": "bin1",
+        "drop": {
+          "x": -0.0827,
+          "y": 0.2277,
+          "z": 0.2455,
+          "roll": -0.2395,
+          "pitch": -1.1787,
+          "yaw": 1.2449,
+          "steps": [
+            2788,
+            2142,
+            1759,
+            2194,
+            1774,
+            2827,
+            3933,
+            1535
+          ]
+        },
+        "hover": null
+      },
+      {
+        "name": "bin2",
+        "drop": {
+          "x": 0.2204,
+          "y": -0.1323,
+          "z": 0.2632,
+          "roll": -0.2181,
+          "pitch": -1.3342,
+          "yaw": -1.1756,
+          "steps": [
+            1347,
+            2287,
+            1715,
+            2007,
+            1775,
+            2827,
+            3933,
+            1535
+          ]
+        },
+        "hover": null
+      }
+    ]
+  },
+  "grasp": {
+    "_help": "Gripper opening 0..1 as the IK API reports it. After closing, an opening above empty_below means something is held (jaws stalled on the pack).",
+    "open": 1.0,
+    "close": 0.0,
+    "empty_below": 0.05,
+    "settle_s": 0,
+    "retries": 1,
+    "relief": 0.04,
+    "_relief_help": "after the close stalls on a pack, the gripper goal is set this far (0..1 opening) inside the measured opening: moderate squeeze instead of a hard stall"
+  },
+  "speed": {
+    "empty": {
+      "speed": 1500,
+      "accel": 100
+    },
+    "loaded": {
+      "speed": 1500,
+      "accel": 100
+    }
+  },
+  "measured": {
+    "_help": "Fill from real runs: picks tried, held, placed, seconds per pick.",
+    "picks_tried": 0,
+    "picks_held": 0,
+    "places_ok": 0,
+    "seconds_per_pick": null,
+    "shoulder_sag_mm": null
+  },
+  "ik_url": "http://127.0.0.1:8020",
+  "safety": {
+    "_help": "fast true: every move is one execute request; only the IK API's own checks (reach, joint limits, table/self collision incl. along the path, stale data) and the STOP file apply. fast false: also solve first, flip guards, reach probes.",
+    "max_step_diff": 150,
+    "fast": false
+  },
+  "sequences": {
+    "_help": "Step order, played by agent/real.py. Steps: home, slot.<pose>, bin.<pose>, open, close, photo, wait:<seconds>. Any <pose> name you use here becomes a pose to teach (agent/teach.py slot1 <pose>). Moves after close and before open run at the loaded speed.",
+    "pick": [
+      "open",
+      "slot.hover",
+      "slot.grip",
+      "close",
+      "slot.hover"
+    ],
+    "place": [
+      "bin.drop",
+      "open"
+    ],
+    "read": [
+      "slot.hover",
+      "slot.read",
+      "wait:0.8",
+      "photo",
+      "slot.hover"
+    ]
+  },
+  "pick_mode": "free",
+  "free_pick": {
+    "_help": "Free pick (pick_mode free): grab height = table + grip_z_above_table_cm (number, or per height class), hover that much higher (lower if it does not solve far out), jaws turned to the pack angle + yaw_offset_deg. Joint jump limits in motor steps: travel = motors 2-6 on the way to the hover, vertical = motors 1-6 going down/up.",
+    "points_file": "agent/config/profiles/thiru/robot_points.json",
+    "grip_z_above_table_cm": 0.5,
+    "hover_above_grip_cm": 5.0,
+    "yaw_offset_deg": 0.0,
+    "max_travel_step_diff": 1500,
+    "max_vertical_step_diff": 300
+  }
+}

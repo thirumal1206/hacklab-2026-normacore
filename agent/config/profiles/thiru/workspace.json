@@ -1,0 +1,105 @@
+{
+  "_owner": "Environment",
+  "_units": "cm in the robot base frame: x forward, y left, z up, table = 0. Angles in degrees.",
+  "table_z_cm": 0.0,
+  "reach": {
+    "_help": "Where IK solves AND the shoulder holds a loaded arm. Measure by driving the tip there; do not guess.",
+    "min_x_cm": 13.0,
+    "max_x_cm": 20.0,
+    "max_abs_y_cm": 12.0
+  },
+  "input_zone": {
+    "_help": "Rectangle where packs arrive. scan() only reports packs inside it.",
+    "x_min_cm": null,
+    "x_max_cm": null,
+    "y_min_cm": null,
+    "y_max_cm": null
+  },
+  "no_go_zones": [
+    {
+      "_help": "Rectangles the arm must never enter (camera stand, cables, lamps).",
+      "name": "camera stand",
+      "x_min_cm": null,
+      "x_max_cm": null,
+      "y_min_cm": null,
+      "y_max_cm": null
+    }
+  ],
+  "bins": [
+    {
+      "name": "Painkillers",
+      "x_cm": null,
+      "y_cm": null,
+      "top_z_cm": null,
+      "inner_w_cm": null,
+      "inner_d_cm": null,
+      "capacity": null,
+      "reach_tested": false
+    },
+    {
+      "name": "Allergy",
+      "x_cm": null,
+      "y_cm": null,
+      "top_z_cm": null,
+      "inner_w_cm": null,
+      "inner_d_cm": null,
+      "capacity": null,
+      "reach_tested": false
+    },
+    {
+      "name": "Vitamins",
+      "x_cm": null,
+      "y_cm": null,
+      "top_z_cm": null,
+      "inner_w_cm": null,
+      "inner_d_cm": null,
+      "capacity": null,
+      "reach_tested": false
+    },
+    {
+      "name": "Unknown",
+      "x_cm": null,
+      "y_cm": null,
+      "top_z_cm": null,
+      "inner_w_cm": null,
+      "inner_d_cm": null,
+      "capacity": null,
+      "reach_tested": false
+    }
+  ],
+  "cameras": {
+    "_help": "Station camera queue ids (GET /api/v1/cameras). They change when a camera is replugged.",
+    "top_id": "3557939296434e9f7dbfba204da8d3af",
+    "gripper_id": "6989659086e3a766ce1d2f384b7244f4",
+    "top_resolution": [
+      320,
+      240
+    ]
+  },
+  "calibration": {
+    "_help": "Pixel -> table homography from touch points. Fit at box-top height if packs are tall.",
+    "homography_file": "agent/config/profiles/thiru/robot_homography.json",
+    "fitted_at_z_cm": 0.0,
+    "rms_mm": 26.5,
+    "max_mm": 95.7,
+    "points_used": 9
+  },
+  "bump_markers": {
+    "_help": "Fixed markers (e.g. corner crosses). Their pixel positions at calibration time; if one moves more than tolerance_px, every tool stops with 'recalibrate'.",
+    "tolerance_px": 4,
+    "markers": [
+      {
+        "name": "corner_tl",
+        "u": null,
+        "v": null
+      }
+    ]
+  },
+  "slots_help": "Packs lie in fixed slots marked on the sheet; their positions are the taught poses in motion.json.",
+  "occupancy": {
+    "_help": "A slot counts as filled when the stand camera differs from the empty-table photo around the slot by more than diff_threshold (0-255). agent/teach.py empty takes the photo.",
+    "empty_image": "runs/agent/empty_table.jpg",
+    "patch_px": 12,
+    "diff_threshold": 25
+  }
+}

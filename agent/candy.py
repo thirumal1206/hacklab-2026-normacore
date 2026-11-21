@@ -50,6 +50,8 @@ def camera():
 
 def to_robot(u, v, width):
     h = json.loads(real.cpath("robot_homography.json").read_text())
+    if (h.get("rms_mm") or 0) > 15:
+        raise RuntimeError(f"this profile's camera mapping is too inaccurate ({h['rms_mm']} mm RMS): pick from the crosses instead")
     s = h["image_size"][0] / width  # the homography was fitted on image_size frames
     x, y = cv2.perspectiveTransform(np.float32([[[u * s, v * s]]]), np.array(h["H_pixel_to_xy"]))[0, 0]
     return float(x) * 100, float(y) * 100
@@ -110,7 +112,7 @@ def spots():
     pts = json.loads(real.cpath("robot_points.json").read_text())["points"]
     far = real.cfg("motion.json").get("candy", {}).get("unreachable_crosses", ["cross_5", "cross_8"])  # too close to hover over
     return [{"id": "cross" + p["name"].split("_")[1], "colour": "?", "x_cm": round(p["pose"]["x"] * 100, 1),
-             "y_cm": round(p["pose"]["y"] * 100, 1), "angle": 0, "reachable": p["name"] not in far}
+             "y_cm": round(p["pose"]["y"] * 100, 1), "angle": 0, "reachable": p["name"] not in far, "pose": p["pose"]}
             for p in pts if p["name"].startswith("cross_")]
 
 
@@ -176,8 +178,8 @@ def pick(ids, bin_name, go=False, candies=None):
     bins = [b["name"] for b in m["poses"]["bins"]]
     if bin_name not in bins:
         return {"error": f"unknown bin {bin_name}; bins: {', '.join(bins)}"}
-    g, zg = m["grasp"], d["table_z_m"] + f["grip_z_above_table_cm"] / 100
-    hover = zg + f["hover_above_grip_cm"] / 100
+    g, zg0 = m["grasp"], d["table_z_m"] + f["grip_z_above_table_cm"] / 100
+    hover0 = zg0 + f["hover_above_grip_cm"] / 100
     ears, st = Ears(bins), {"bin": bin_name, "cancel": False, "pauses": 0, "switches": []}
 
     def hear():
@@ -220,20 +222,33 @@ def pick(ids, bin_name, go=False, candies=None):
         t = time.monotonic()
         x, y = c["x_cm"] / 100, c["y_cm"] / 100
         rpy = (d["grip"]["roll"], d["grip"]["pitch"], real.jaw_yaw(c.get("angle", 0), f))
-        at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, zg, *rpy)))
+        zg, hover = zg0, hover0
+        if c.get("pose"):  # a recorded cross: go down to exactly the pose shown there (this laptop's heights vary with pose)
+            P = c["pose"]
+            x, y, rpy = P["x"], P["y"], (P["roll"], P["pitch"], P["yaw"])
+            zg = P["z"] + f["grip_z_above_table_cm"] / 100
+            hover = zg + f["hover_above_grip_cm"] / 100
         none = (0, range(0))
+        lower = real.cfg("motion.json").get("candy", {}).get("retry_lower_cm", [0.5, 0.8])  # each retry goes this much lower
         try:
-            if real.DRY or real.jaw_goal() < g["open"] - 0.05:
-                step(lambda: real.grip(g["open"]))
             step(lambda: real.free_move(x, y, hover, rpy, "hover", None, *none))
-            step(lambda: real.free_move(x, y, zg, rpy, "down", None, *none))
-            opening = step(lambda: real.grip(g["close"], settle=False, at=at))
+            for attempt, dz in enumerate([0.0, *lower]):
+                z = zg - dz / 100
+                at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, z, *rpy)))
+                if real.DRY or real.jaw_goal() < g["open"] - 0.05:
+                    step(lambda: real.grip(g["open"]))
+                step(lambda: real.free_move(x, y, z, rpy, "down", None, *none))
+                opening = step(lambda: real.grip(g["close"], settle=False, at=at))
+                if opening is None or opening >= g["empty_below"]:
+                    break
+                log(event="missed", id=c["id"], opening=opening, attempt=attempt + 1, z_cm=round(z * 100, 1))
+                if attempt < len(lower):
+                    step(lambda: real.grip(g["open"], at=at))  # open where it is and try again a little lower
             if opening is not None and opening >= g["empty_below"]:
                 step(lambda: real.grip(max(opening - g.get("relief", 0.04), 0.0), at=at))
             step(lambda: real.free_move(x, y, hover, rpy, "up", None, *none, loaded=True))
             if opening is not None and opening < g["empty_below"]:
-                done.append({"id": c["id"], "result": f"missed: jaws closed to {opening:.2f}"})
-                log(event="missed", id=c["id"], opening=opening)
+                done.append({"id": c["id"], "result": f"missed {attempt + 1} times: jaws closed to {opening:.2f}"})
                 continue
             hear()  # a bin switch said while the candy is in the jaws still counts
             target = st["bin"]
@@ -244,7 +259,7 @@ def pick(ids, bin_name, go=False, candies=None):
             done.append({"id": c["id"], "result": f"refused: {e}"})
             log(event="refused", id=c["id"], reason=str(e))
             continue
-        res = {"id": c["id"], "colour": c["colour"], "bin": target, "seconds": round(time.monotonic() - t, 1),
+        res = {"id": c["id"], "colour": c["colour"], "bin": target, "seconds": round(time.monotonic() - t, 1), "attempts": attempt + 1,
                "result": "dry run" if real.DRY else "dropped"}
         done.append(res)
         log(event="picked", **res)

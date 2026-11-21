@@ -122,6 +122,9 @@ def record(name):
     pose = still_pose()
     point["pose"] = pose
     save(POINTS, pts)
+    if name.startswith("cross_") and pts.get("cross_camera_id"):  # photo with the tips on the cross: mark_crosses.py clicks them
+        (real.CONFIG / f"{name}.jpg").write_bytes(real.api("GET", f"/cameras/{pts['cross_camera_id']}/image"))
+        print(f"  photo saved: {name}.jpg")
     report(name, pose, pts)
     write_motion(name, pose)
 
@@ -138,8 +141,8 @@ def show_list():
 
 def interactive():
     show_list()
-    print("\nGuide the follower with the leader, hold still, then: Enter = record the next missing point, "
-          "a point name = record that one, l = list, q = quit")
+    print("\nGuide the follower with the leader, or by hand after 'limp' (hold the arm first!), keep it still, then: "
+          "Enter = record the next missing point, a point name = redo that one, l = list, limp / hold = torque off / on, q = quit")
     while True:
         miss = [p for p in load(POINTS)["points"] if not p["pose"]]
         if miss:
@@ -151,6 +154,10 @@ def interactive():
             return
         if cmd == "l":
             show_list()
+            continue
+        if cmd in ("limp", "hold"):  # move the follower by hand instead of mirroring the leader
+            real.api("POST", f"/arms/{load(MOTION)['follower_bus']}/torque", {"enabled": cmd == "hold"})
+            print("  torque OFF: support the arm, it is limp" if cmd == "limp" else "  torque ON: the arm holds where it is")
             continue
         name = cmd or (miss[0]["name"] if miss else None)
         if not name:

@@ -1,0 +1,339 @@
+{
+  "_owner": "Motion",
+  "_help": "Points recorded by agent/record_points.py from the follower while it mirrors the leader. Never typed by hand. Units: m and rad, IK API frame (origin on the base axis, x forward, y left, z up). Recorded on Thiru's laptop with the follower moved by hand (torque off); cross pixels clicked in photos taken at each cross (agent/mark_crosses.py).",
+  "cross_pixels_csv": "agent/config/profiles/thiru/cross_pixels.csv",
+  "cross_camera_id": "3557939296434e9f7dbfba204da8d3af",
+  "cross_image_size": [
+    1280,
+    960
+  ],
+  "points": [
+    {
+      "name": "home",
+      "how": "safe start pose, arm out of the top camera's view",
+      "pose": {
+        "x": 0.0473,
+        "y": 0.0075,
+        "z": 0.4929,
+        "roll": 1.4166,
+        "pitch": -0.4043,
+        "yaw": -2.4903,
+        "steps": [
+          2254,
+          2017,
+          1351,
+          2078,
+          2006,
+          2079,
+          3054,
+          2830
+        ],
+        "gripper": 0.973,
+        "time": "2026-11-21 21:36:01"
+      }
+    },
+    {
+      "name": "cross_1",
+      "how": "jaws CLOSED, tips touching the centre of cross 1, gripper pointing straight down",
+      "pose": {
+        "x": 0.1804,
+        "y": -0.1111,
+        "z": 0.0347,
+        "roll": -1.0689,
+        "pitch": 0.1466,
+        "yaw": -1.4091,
+        "steps": [
+          1503,
+          2224,
+          1905,
+          2295,
+          1917,
+          2661,
+          3053,
+          1326
+        ],
+        "gripper": 0.063,
+        "time": "2026-11-21 21:37:28"
+      }
+    },
+    {
+      "name": "cross_2",
+      "how": "jaws closed, tips on the centre of cross 2, pointing down",
+      "pose": {
+        "x": 0.2302,
+        "y": -0.0013,
+        "z": 0.0383,
+        "roll": -1.0417,
+        "pitch": 0.0665,
+        "yaw": -0.8487,
+        "steps": [
+          1857,
+          2276,
+          1854,
+          2294,
+          1917,
+          2620,
+          3054,
+          1325
+        ],
+        "gripper": 0.062,
+        "time": "2026-11-21 21:38:13"
+      }
+    },
+    {
+      "name": "cross_3",
+      "how": "jaws closed, tips on the centre of cross 3, pointing down",
+      "pose": {
+        "x": 0.1696,
+        "y": 0.1849,
+        "z": 0.0611,
+        "roll": -0.8642,
+        "pitch": 0.2197,
+        "yaw": -0.0203,
+        "steps": [
+          2294,
+          2388,
+          1848,
+          2103,
+          1885,
+          2774,
+          3052,
+          1325
+        ],
+        "gripper": 0.062,
+        "time": "2026-11-21 21:38:48"
+      }
+    },
+    {
+      "name": "cross_4",
+      "how": "jaws closed, tips on the centre of cross 4, pointing down",
+      "pose": {
+        "x": 0.1124,
+        "y": 0.2246,
+        "z": 0.0622,
+        "roll": -0.8628,
+        "pitch": 0.2097,
+        "yaw": 0.2613,
+        "steps": [
+          2462,
+          2382,
+          1849,
+          2103,
+          1885,
+          2773,
+          3055,
+          1327
+        ],
+        "gripper": 0.064,
+        "time": "2026-11-21 21:39:08"
+      }
+    },
+    {
+      "name": "cross_5",
+      "how": "jaws closed, tips on the centre of cross 5, pointing down",
+      "pose": {
+        "x": 0.1578,
+        "y": -0.1638,
+        "z": 0.0557,
+        "roll": -0.8778,
+        "pitch": 0.324,
+        "yaw": -1.7163,
+        "steps": [
+          1275,
+          2281,
+          1928,
+          2167,
+          1882,
+          2773,
+          3054,
+          1325
+        ],
+        "gripper": 0.062,
+        "time": "2026-11-21 21:39:33"
+      }
+    },
+    {
+      "name": "cross_6",
+      "how": "jaws closed, tips on the centre of cross 6, pointing down",
+      "pose": {
+        "x": 0.1479,
+        "y": 0.0537,
+        "z": 0.0397,
+        "roll": -0.9605,
+        "pitch": 0.3287,
+        "yaw": -0.9179,
+        "steps": [
+          1858,
+          1850,
+          2024,
+          2609,
+          1882,
+          2616,
+          3052,
+          1326
+        ],
+        "gripper": 0.063,
+        "time": "2026-11-21 21:39:58"
+      }
+    },
+    {
+      "name": "cross_7",
+      "how": "jaws closed, tips on the centre of cross 7, pointing down",
+      "pose": {
+        "x": 0.0451,
+        "y": 0.2007,
+        "z": 0.0353,
+        "roll": -0.9725,
+        "pitch": 0.2384,
+        "yaw": 0.3057,
+        "steps": [
+          2588,
+          2103,
+          2019,
+          2322,
+          1890,
+          2612,
+          3052,
+          1326
+        ],
+        "gripper": 0.063,
+        "time": "2026-11-21 21:40:24"
+      }
+    },
+    {
+      "name": "cross_8",
+      "how": "jaws closed, tips on the centre of cross 8, pointing down",
+      "pose": {
+        "x": 0.0714,
+        "y": -0.0686,
+        "z": 0.0008,
+        "roll": -1.4546,
+        "pitch": 0.0584,
+        "yaw": -1.333,
+        "steps": [
+          1474,
+          1775,
+          2093,
+          2595,
+          1982,
+          2611,
+          3053,
+          1327
+        ],
+        "gripper": 0.064,
+        "time": "2026-11-21 21:40:40"
+      }
+    },
+    {
+      "name": "cross_9",
+      "how": "jaws closed, tips on the centre of cross 9, pointing down",
+      "pose": {
+        "x": -0.0221,
+        "y": 0.0994,
+        "z": -0.0011,
+        "roll": -1.2836,
+        "pitch": 0.2965,
+        "yaw": 0.6879,
+        "steps": [
+          2747,
+          1731,
+          2242,
+          2463,
+          1936,
+          2686,
+          3053,
+          1326
+        ],
+        "gripper": 0.063,
+        "time": "2026-11-21 21:41:16"
+      }
+    },
+    {
+      "name": "grip_ref",
+      "how": "a real pack in the middle of the table: jaws closed AROUND it exactly as a pick should hold it",
+      "pose": {
+        "x": 0.1501,
+        "y": 0.0873,
+        "z": 0.0091,
+        "roll": -1.157,
+        "pitch": -0.3385,
+        "yaw": 0.669,
+        "steps": [
+          2072,
+          1978,
+          2285,
+          2111,
+          1908,
+          2669,
+          3934,
+          1535
+        ],
+        "gripper": 0.189,
+        "time": "2026-11-21 21:42:29"
+      }
+    },
+    {
+      "name": "bin1",
+      "how": "centre of bin 1, pointing down, jaw tips 2-4 cm above the rim (release here)",
+      "pose": {
+        "x": -0.0827,
+        "y": 0.2277,
+        "z": 0.2455,
+        "roll": -0.2395,
+        "pitch": -1.1787,
+        "yaw": 1.2449,
+        "steps": [
+          2788,
+          2142,
+          1759,
+          2194,
+          1774,
+          2827,
+          3933,
+          1535
+        ],
+        "gripper": 0.189,
+        "time": "2026-11-21 22:11:53"
+      }
+    },
+    {
+      "name": "bin2",
+      "how": "centre of bin 2, pointing down, jaw tips 2-4 cm above the rim",
+      "pose": {
+        "x": 0.2204,
+        "y": -0.1323,
+        "z": 0.2632,
+        "roll": -0.2181,
+        "pitch": -1.3342,
+        "yaw": -1.1756,
+        "steps": [
+          1347,
+          2287,
+          1715,
+          2007,
+          1775,
+          2827,
+          3933,
+          1535
+        ],
+        "gripper": 0.189,
+        "time": "2026-11-21 22:13:13"
+      }
+    }
+  ],
+  "derived": {
+    "table_z_m": 0.0383,
+    "homography_file": "agent/config/profiles/thiru/robot_homography.json",
+    "rms_mm": 26.5,
+    "worst_loo_mm": 95.7,
+    "crosses_used": 9,
+    "grip": {
+      "z_above_table_m": -0.0292,
+      "roll": -1.157,
+      "pitch": -0.3385,
+      "yaw": 0.669,
+      "gripper_closed_on_pack": 0.189,
+      "hover_offset_m": 0.05
+    }
+  }
+}

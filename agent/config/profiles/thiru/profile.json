@@ -1,0 +1,10 @@
+{
+  "_help": "Calibration recorded on one laptop; see ../README.md.",
+  "name": "thiru",
+  "laptop": "Thiru's MacBook Pro",
+  "hostnames": [
+    "zdfdigitals-MacBook-Pro"
+  ],
+  "recorded": "2026-11-21, in progress",
+  "follower_bus": "5B79016927"
+}
