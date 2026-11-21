@@ -50,6 +50,16 @@ class Stopped(Exception):
     pass
 
 
+CONTEXT = {"pack": None, "seq": None}  # which pack and sequence the next steps belong to
+
+
+def log(**row):
+    """One line per arm step in runs/agent/motion.jsonl: what was asked, what the arm did, how far off, how long."""
+    RUNS.mkdir(parents=True, exist_ok=True)
+    with (RUNS / "motion.jsonl").open("a") as fh:
+        fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), **CONTEXT, **row}) + "\n")
+
+
 def cfg(name):
     return json.loads(cpath(name).read_text())
 
@@ -118,9 +128,13 @@ def need_profile():
 def move(pose, label, loaded=False):
     need_profile()
     if STOP.exists():
+        log(step=label, kind="move", result="stopped")
         raise Stopped(f"stopped by a person before '{label}'")
     if not pose:
+        log(step=label, kind="move", result="not taught")
         raise RuntimeError(f"pose '{label}' is not taught: agent/teach.py")
+    t0 = time.time()
+    target = {k: round(pose[k] * 100, 1) for k in "xyz"}
     m = cfg("motion.json")
     sp = m["speed"]["loaded" if loaded else "empty"]
     body = {"position": {"x": pose["x"], "y": pose["y"], "z": pose["z"]},
@@ -130,6 +144,8 @@ def move(pose, label, loaded=False):
         body["gripper"] = jaw_goal()  # keep the jaws torqued (see jaw_goal)
     if m["safety"].get("fast") and not DRY:  # fast: one request, only the IK API's own checks
         r = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)
+        log(step=label, kind="move", loaded=loaded, speed=sp["speed"], target_cm=target, status=r.get("motion", {}).get("status"),
+            seconds=round(time.time() - t0, 2), fast=True)
         return r.get("motion", {}).get("status")
     plan = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": False})
     steps = plan.get("motor_steps", [])
@@ -140,23 +156,33 @@ def move(pose, label, loaded=False):
         now, lim = steps_now(), m.get("free_pick", {}).get("max_travel_step_diff", 1500)
         jump = max(abs(steps[i] - now[i]) for i in range(1, 6))
         if jump > lim:
+            log(step=label, kind="move", target_cm=target, step_diff=diff, result="refused: flipped joint")
             raise RuntimeError(f"'{label}': IK solution is {diff} steps from the taught pose and a joint would jump "
                                f"{jump} steps (limit {lim}), not moving")
     if DRY:
         print(f"  dry: {label} solves ({pose['x']*100:.1f}, {pose['y']*100:.1f}, {pose['z']*100:.1f}) cm")
         return "dry"
     r = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)
-    return r.get("motion", {}).get("status")
+    status = r.get("motion", {}).get("status")
+    a = follower()
+    got = {k: round(a["pose"]["position"][k] * 100, 1) for k in "xyz"}
+    off = round(10 * sum((got[k] - target[k]) ** 2 for k in "xyz") ** 0.5, 1)
+    log(step=label, kind="move", loaded=loaded, speed=sp["speed"], target_cm=target, reached_cm=got, off_mm=off,
+        step_diff=diff, status=status, seconds=round(time.time() - t0, 2),
+        steps=[j["steps"] for j in sorted(a["joints"], key=lambda j: j["motor"])])
+    return status
 
 
 def grip(opening, settle=True, at=None):
     """Move the jaws to `opening` while holding the arm at pose `at` (dict x, y, z, roll, pitch, yaw; default:
     where the arm is now), in one move-to so the arm keeps its torque (see jaw_goal)."""
     if STOP.exists():
+        log(step="gripper", kind="grip", result="stopped")
         raise Stopped("stopped by a person before the gripper move")
     if DRY:
         print(f"  dry: gripper -> {opening}")
         return None
+    t0 = time.time()
     m = cfg("motion.json")
     if at is None:
         f = follower()
@@ -169,7 +195,10 @@ def grip(opening, settle=True, at=None):
          "speed": m["speed"]["empty"]["speed"], "accel": m["speed"]["empty"]["accel"]}, timeout=30)
     if settle:
         time.sleep(m["grasp"]["settle_s"])
-    return follower().get("gripper") or 0.0
+    got = follower().get("gripper") or 0.0
+    log(step="close" if opening < 0.5 else "open", kind="grip", asked=opening, opening=round(got, 3),
+        seconds=round(time.time() - t0, 2))
+    return got
 
 
 def slot(name_or_xy):
@@ -187,6 +216,7 @@ def bin_pose(name):
 # ---- the interface sorter.py calls (same as FakeBackend) ----
 
 def home():
+    CONTEXT["seq"] = "home"
     move(cfg("motion.json")["poses"]["home"], "home")
     return {"ok": True}
 
@@ -197,6 +227,7 @@ STEP_KINDS = ("home", "slot.", "bin.", "open", "close", "photo", "wait:")
 def run_seq(name, s=None, b=None, pack_id=None):
     """Play one sequence from motion.json. Returns the gripper opening after the last close and the photo path, if any."""
     m = cfg("motion.json")
+    CONTEXT.update(pack=pack_id or (s or {}).get("name") or CONTEXT["pack"], seq=name)
     bad = [st for st in m["sequences"][name] if not st.startswith(STEP_KINDS) or st in ("slot.", "bin.")]
     if bad:  # checked before the first move, so a typo never leaves the arm halfway
         raise RuntimeError(f"unknown step {bad[0]!r} in sequence {name}; steps: {', '.join(STEP_KINDS)}")
@@ -218,6 +249,7 @@ def run_seq(name, s=None, b=None, pack_id=None):
             path = RUNS / f"crop_{pack_id}.jpg"
             path.write_bytes(api("GET", f"/cameras/{cfg('workspace.json')['cameras']['gripper_id']}/image"))
             out["photo"] = str(path)
+            log(step="photo", kind="photo", photo=path.name)
         elif step.startswith("wait:"):
             time.sleep(float(step[5:]))
         else:
@@ -260,10 +292,14 @@ def free_move(x, y, z, rpy, label, ref, max_diff, motors, loaded=False, execute=
             "speed": sp["speed"], "accel": sp["accel"]}
     if execute and not DRY:
         body["gripper"] = jaw_goal()  # keep the jaws torqued (see jaw_goal)
+    t0, target = time.time(), {"x": round(x * 100, 1), "y": round(y * 100, 1), "z": round(z * 100, 1)}
     if m["safety"].get("fast") and execute and not DRY:  # fast: one request, only the IK API's own checks
         try:
-            return api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)["motor_steps"]
+            st = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)["motor_steps"]
+            log(step=label, kind="move", loaded=loaded, speed=sp["speed"], target_cm=target, seconds=round(time.time() - t0, 2), fast=True)
+            return st
         except RuntimeError as e:
+            log(step=label, kind="move", target_cm=target, result="refused: " + str(e)[-80:])
             raise Refused(f"'{label}' at ({x*100:.1f}, {y*100:.1f}, {z*100:.1f}) cm: {str(e)[-160:]}") from None
     try:
         plan = api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": False})
@@ -279,6 +315,8 @@ def free_move(x, y, z, rpy, label, ref, max_diff, motors, loaded=False, execute=
         print(f"  dry: {label:6} ({x*100:5.1f}, {y*100:5.1f}, {z*100:5.1f}) cm solves, biggest joint change {diff}")
     elif execute:
         api("POST", f"/arms/{m['follower_bus']}/move-to", {**body, "execute": True}, timeout=30)
+        log(step=label, kind="move", loaded=loaded, speed=sp["speed"], target_cm=target, step_diff=diff,
+            seconds=round(time.time() - t0, 2))
     return steps
 
 
@@ -340,6 +378,7 @@ def pick_slot(x_cm, y_cm, angle=0, height_class="flat"):
     except Stopped as e:
         return {"holding": False, "reason": str(e)}
     if opening < g["empty_below"]:
+        log(step="grasp check", kind="check", result=f"nothing caught: opening {opening:.2f} < {g['empty_below']}")
         grip(g["open"])
         return {"holding": False, "reason": f"jaws closed to {opening:.2f}: nothing caught in {s['name']}"}
     return {"holding": True, "reason": f"jaws stalled at {opening:.2f}", "slot": s["name"]}
