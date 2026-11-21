@@ -14,14 +14,17 @@ from sorter import Sorter  # noqa: E402
 S = {"type": "string"}
 TOOLS = {  # name: (description, {param: schema}, required)
     "scan": ("Lists every pack on the table: id, product, code, expiry, days_left, recalled, in_reach, fragile. Call once per batch.", {}, []),
-    "list_bins": ("Bins and the sorting rules.", {}, []),
-    "inspect": ("Label photo of one pack, for when code or expiry is null. Read them, then pass read_code / read_expiry to sort.",
+    "list_bins": ("Bins, and which product goes to which bin.", {}, []),
+    "inspect": ("Close-up photo of one pack from the wrist camera. Read the printed name and pass it to sort as read_name.",
                 {"id": S}, ["id"]),
     "sort": ("Pick one pack and place it in a bin, then verify. Refused (with the reason and the expected bin) if it breaks a rule. "
              "One call per pack, one at a time.",
-             {"id": S, "bin": S, "reason": S, "read_code": S, "read_expiry": S}, ["id", "bin", "reason"]),
+             {"id": S, "bin": S, "reason": S, "read_name": S, "read_code": S, "read_expiry": S}, ["id", "bin", "reason"]),
     "flag": ("Leave a pack for a person, with the reason (out of reach, grasp failed twice, unclear label).",
              {"id": S, "reason": S}, ["id", "reason"]),
+    "say": ("Speak one short line aloud as Friday (also shown on the dashboard). One line per instruction.", {"text": S}, ["text"]),
+    "listen": ("Wait for the next spoken or typed instruction from the dashboard. Returns instruction, or null after wait_s.",
+               {"wait_s": {"type": "number"}}, []),
     "summary": ("End-of-batch result: counts per bin, flagged, refused, left on the table, proof log path.", {}, []),
 }
 sorter = None
@@ -31,9 +34,13 @@ def run_tool(name, a):
     global sorter
     sorter = sorter or Sorter()
     if name == "sort":
-        out = sorter.sort(a["id"], a["bin"], a["reason"], a.get("read_code"), a.get("read_expiry"))
+        out = sorter.sort(a["id"], a["bin"], a["reason"], a.get("read_code"), a.get("read_expiry"), a.get("read_name"))
     elif name in ("inspect",):
         out = sorter.inspect(a["id"])
+    elif name == "say":
+        out = sorter.say(a["text"])
+    elif name == "listen":
+        out = sorter.listen(a.get("wait_s", 300))
     elif name == "flag":
         out = sorter.flag(a["id"], a["reason"])
     else:

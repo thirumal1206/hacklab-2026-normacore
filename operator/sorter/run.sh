@@ -8,9 +8,9 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 SANDBOX=$ROOT/runs/agent/session   # empty working dir: no project files to read
 mkdir -p "$SANDBOX"
-MCP=$(printf '{"mcpServers":{"sorter":{"command":"%s","args":["%s"],"env":{"AGENT_BACKEND":"%s","AGENT_DRY_RUN":"%s"}}}}' \
-  "$ROOT/.venv/bin/python" "$ROOT/agent/mcp_server.py" "${AGENT_BACKEND:-fake}" "${AGENT_DRY_RUN:-0}")
-TOOLS=mcp__sorter__scan,mcp__sorter__list_bins,mcp__sorter__inspect,mcp__sorter__sort,mcp__sorter__flag,mcp__sorter__summary
+MCP=$(printf '{"mcpServers":{"sorter":{"command":"%s","args":["%s"],"env":{"AGENT_BACKEND":"%s","AGENT_DRY_RUN":"%s","ARM_TTS":"%s"}}}}' \
+  "$ROOT/.venv/bin/python" "$ROOT/agent/mcp_server.py" "${AGENT_BACKEND:-fake}" "${AGENT_DRY_RUN:-0}" "${ARM_TTS:-say}")
+TOOLS=mcp__sorter__scan,mcp__sorter__list_bins,mcp__sorter__inspect,mcp__sorter__sort,mcp__sorter__flag,mcp__sorter__summary,mcp__sorter__say,mcp__sorter__listen
 cd "$SANDBOX"
 exec claude -p "${1:-Sort every pack on the table.}" \
   --model "${AGENT_MODEL:-haiku}" \

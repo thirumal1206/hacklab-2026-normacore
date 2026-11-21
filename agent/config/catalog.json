@@ -1,7 +1,13 @@
 {
   "_owner": "Agent + team",
-  "_help": "Every product that may appear. A code not listed here is 'unknown' and can never go to Stock.",
+  "_help": "Every tablet pack that may appear: printed name, other spellings Claude might read, and its bin (must be a bin name in workspace.json).",
   "products": [
-    {"code": "EXAMPLE-0001", "name": "Example tablets 20 pcs", "width_cm": null, "depth_cm": null, "height_cm": null, "fragile": false}
+    {
+      "name": "Example 400 mg",
+      "aliases": [
+        "example"
+      ],
+      "bin": "Painkillers"
+    }
   ]
 }
