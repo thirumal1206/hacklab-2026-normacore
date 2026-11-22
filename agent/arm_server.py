@@ -12,6 +12,7 @@ The agent (created by create_voice_agent.py) calls these as client tools from th
     POST /api/stop | /api/resume | /api/abort | /api/cancel | /api/home
     POST /api/bin    {bin}            later objects of the running pick go there
     POST /api/gripper {action: open|close}
+    POST /api/feed                    candy from the taught spot to the person (config/feed_poses.json), slow near them
     GET  /api/events?after=N          progress events for the page (and through it the agent)
     GET  /api/session                 signed ElevenLabs URL (key stays here, from .env)
 The page also sends a stop word straight to /api/stop, before the agent has thought about it. The STOP button and the
@@ -39,6 +40,10 @@ ORIGINS = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
 REPO = Path(__file__).resolve().parent.parent
 AGENT_FILE = real.CONFIG / "voice_agent.json"  # agent id (not a secret), written by create_voice_agent.py
 PAGE_FILE = Path(__file__).resolve().parent / "voice_page.html"
+FEED_FILE = real.CONFIG / "feed_poses.json"  # candy + feed poses, taught by hand (follower FK, m and rad)
+FEED_HOVER_M = 0.06  # above the candy before going down
+FEED_SPEED = {"speed": 400, "accel": 30}  # ADJUST: slow moves near the person (normal 1500 / 100)
+FEED_DROP_WAIT_S = 1.5  # ADJUST: at the feed pose, wait this long, then open the jaws (candy drops into the mouth)
 
 
 def env(name):
@@ -68,6 +73,7 @@ class Arm:
     def __init__(self, go):
         self.go, self.lock, self.thread, self.ctl = go, threading.Lock(), None, None
         self.events, self.seq, self.default_bin = deque(maxlen=200), 0, "bin1"
+        self.at_feed = False  # arm is at the feed pose (near the person): go home slowly
         voice_ctl.say = lambda text: self.event("info", text)  # batch_pick's spoken lines become events
 
     def event(self, kind, text):
@@ -157,11 +163,68 @@ class Arm:
         if real.STOP.exists():
             return "Stopped: say continue first."
         if what == "home":
-            real.home()
+            if self.at_feed:
+                self._slow(real.cfg("motion.json")["poses"]["home"], "home")
+                self.at_feed = False
+            else:
+                real.home()
             return "Home."
         g = real.cfg("motion.json")["grasp"]
         real.grip(g["open"] if what == "open" else g["close"])
         return "Gripper open." if what == "open" else "Gripper closed."
+
+    def _slow(self, pose, label, gripper=None):
+        """One move-to at FEED_SPEED (keeps the jaws torqued). The stop word still blocks it."""
+        if real.STOP.exists():
+            raise real.Stopped(f"stopped by a person before '{label}'")
+        if real.DRY:
+            self.event("info", f"dry: {label}")
+            return
+        real.api("POST", f"/arms/{real.cfg('motion.json')['follower_bus']}/move-to",
+                 {"position": {k: pose[k] for k in ("x", "y", "z")},
+                  "orientation": {"rpy": {k: pose[k] for k in ("roll", "pitch", "yaw")}},
+                  "gripper": real.jaw_goal() if gripper is None else gripper, "execute": True, **FEED_SPEED}, timeout=60)
+
+    def feed(self):
+        if self.busy():
+            return "Busy: a pick is running."
+        if real.STOP.exists():
+            return "Stopped: say continue first."
+        poses = json.loads(FEED_FILE.read_text())
+        self.thread = threading.Thread(target=self._feed, args=(poses,), daemon=True)
+        self.thread.start()
+        return "Getting a candy for you."
+
+    def _feed(self, poses):
+        try:
+            g = real.cfg("motion.json")["grasp"]
+            c, f = poses["candy"], poses["feed"]
+            above = {**c, "z": c["z"] + FEED_HOVER_M}
+            real.grip(g["open"])
+            real.move(above, "above the candy")
+            real.move(c, "down to the candy")
+            opening = real.grip(g["close"], settle=False, at=c)
+            if opening is not None and opening < g["empty_below"]:
+                real.grip(g["open"], at=c)
+                real.move(above, "up")
+                self.event("done", "I missed the candy. Is it on the marked spot?")
+                return
+            if opening is not None:
+                real.set_jaw(max(opening - g.get("relief", 0.04), 0.0))
+                real.grip(real.jaw_goal(), at=c)
+            real.move(above, "up", loaded=True)
+            self._slow(f, "to the person")
+            self.at_feed = True
+            self.event("info", "Open your mouth.")
+            time.sleep(FEED_DROP_WAIT_S)
+            if real.STOP.exists():
+                raise real.Stopped("stopped by a person before the drop")
+            real.grip(g["open"], at=f)
+            self.event("done", "Enjoy your candy. Say go back when you are done.")
+        except (real.Stopped, real.Refused, RuntimeError, OSError) as e:
+            self.event("error", f"Feeding stopped: {e}")
+        finally:
+            real.DRY = not self.go
 
     def session(self):
         key, agent = env("ELEVENLABS_API_KEY"), env("ELEVENLABS_AGENT_ID")
@@ -225,6 +288,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/stop": ARM.stop, "/api/resume": ARM.resume, "/api/abort": ARM.abort, "/api/cancel": ARM.cancel,
             "/api/bin": lambda: ARM.set_bin(body.get("bin")),
             "/api/home": lambda: ARM.idle_move("home"),
+            "/api/feed": ARM.feed,
             "/api/gripper": lambda: ARM.idle_move("open" if body.get("action") == "open" else "close"),
         }
         fn = routes.get(self.path)

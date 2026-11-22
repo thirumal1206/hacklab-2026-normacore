@@ -92,6 +92,7 @@ const clientTools = {
   set_bin: ({ bin }) => post("/api/bin", { bin }),
   go_home: () => post("/api/home"),
   gripper: ({ action }) => post("/api/gripper", { action }),
+  feed_person: () => post("/api/feed"),
 };
 
 async function start() {

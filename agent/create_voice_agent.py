@@ -41,6 +41,12 @@ PICKING:
 - "Bin 3" during a pick: call set_bin. "Go home": go_home. "Open/close your claws": gripper.
 - pick_objects returns at once; the arm keeps working while you talk. If it says busy, tell the person.
 
+FEEDING (the person cannot use their arms):
+- "Feed me", "I'm hungry", "give me a candy": call feed_person at once (no get_objects needed), say "Coming."
+- "Let go", "release", "open", "I have it": call gripper with action open.
+- "Go back", "I'm done", "thank you": call go_home.
+- Say nothing about coordinates; be warm and very brief.
+
 ROBOT MESSAGES:
 - "Robot update: ..." context lines are progress: just know them, stay quiet unless asked.
 - A user message starting with "EVENT:" comes from the robot, not the person: report it in a few words
@@ -71,6 +77,8 @@ TOOLS = [
     client_tool("set_bin", "Send the following objects of the running pick to another bin.", {"bin": s("bin1 .. bin5.")}, ["bin"]),
     client_tool("go_home", "Move the arm to its home pose (only when no pick is running)."),
     client_tool("gripper", "Open or close the gripper (only when no pick is running).", {"action": s("open or close.")}, ["action"]),
+    client_tool("feed_person", "Take the candy from the feeding spot and bring it slowly in front of the person's mouth, then open the jaws so it drops in. "
+                "Returns at once; a robot message says when the candy is there or if it was missed."),
 ]
 
 AGENT = {
