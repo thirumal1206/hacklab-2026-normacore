@@ -49,6 +49,28 @@
     3.9,
     4.0
    ]
+  },
+  {
+   "name": "red pencil",
+   "category": "pencil",
+   "colors": [
+    "red"
+   ],
+   "size_cm": [
+    3.3,
+    12.9
+   ]
+  },
+  {
+   "name": "green pencil",
+   "category": "pencil",
+   "colors": [
+    "green"
+   ],
+   "size_cm": [
+    2.8,
+    15.4
+   ]
   }
  ]
 }
