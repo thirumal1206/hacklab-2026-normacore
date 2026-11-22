@@ -22,7 +22,7 @@ TOOLS = {  # name: (description, {param: schema}, required)
              {"id": S, "bin": S, "reason": S, "read_name": S, "read_code": S, "read_expiry": S}, ["id", "bin", "reason"]),
     "flag": ("Leave a pack for a person, with the reason (out of reach, grasp failed twice, unclear label).",
              {"id": S, "reason": S}, ["id", "reason"]),
-    "say": ("Speak one short line aloud as Friday (also shown on the dashboard). One line per instruction.", {"text": S}, ["text"]),
+    "say": ("Speak one short line aloud as Alfred (also shown on the dashboard). One line per instruction.", {"text": S}, ["text"]),
     "listen": ("Wait for the next spoken or typed instruction from the dashboard. Returns instruction, or null after wait_s.",
                {"wait_s": {"type": "number"}}, []),
     "summary": ("End-of-batch result: counts per bin, flagged, refused, left on the table, proof log path.", {}, []),

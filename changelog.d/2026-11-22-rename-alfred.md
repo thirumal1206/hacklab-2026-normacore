@@ -1,0 +1,1 @@
+- The assistant is now called **Alfred** (was Friday): ElevenLabs agent name, prompt and greeting, voice page, dashboard and live-view wake word ("Alfred, ..."), pack and operator instructions, docs.

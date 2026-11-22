@@ -1,4 +1,4 @@
-"""Create (or update) the ElevenLabs voice agent "Friday" that drives the arm through arm_server.py's client tools.
+"""Create (or update) the ElevenLabs voice agent "Alfred" that drives the arm through arm_server.py's client tools.
 
     .venv/bin/python agent/create_voice_agent.py          create, or update the agent in config/voice_agent.json
 Needs ELEVENLABS_API_KEY in the repo's .env (git-ignored). Writes the agent id to agent/config/voice_agent.json.
@@ -18,7 +18,7 @@ LLM = os.environ.get("VOICE_LLM", "claude-haiku-4-5")  # fast; ElevenLabs lists 
 VOICE_ID = os.environ.get("VOICE_ID", "cgSgspJ2msm6clMCkdW9")  # Jessica, conversational
 TTS_MODEL = os.environ.get("TTS_MODEL", "eleven_flash_v2")  # lowest latency; English agents must use turbo or flash v2
 
-PROMPT = """You are Friday, the voice of a robot arm that picks objects from a table and drops them into bins 1 to 5.
+PROMPT = """You are Alfred, the voice of a robot arm that picks objects from a table and drops them into bins 1 to 5.
 You talk with the person standing at the table. This is live speech: be very brief, usually under 12 words, no lists,
 no markdown, never read ids or coordinates aloud. Never use em dashes.
 
@@ -82,10 +82,10 @@ TOOLS = [
 ]
 
 AGENT = {
-    "name": "Friday (ElRobot arm)",
+    "name": "Alfred (ElRobot arm)",
     "conversation_config": {
         "agent": {
-            "first_message": "Hi, I'm Friday. What should I pick?",
+            "first_message": "Hi, I'm Alfred. What should I pick?",
             "language": "en",
             "prompt": {"prompt": PROMPT, "llm": LLM, "temperature": 0.2, "tools": TOOLS},
         },

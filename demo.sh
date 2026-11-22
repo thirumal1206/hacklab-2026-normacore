@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# The whole demo in one command: health checks, dashboard, then Friday (Claude, locked down) listening for voice.
+# The whole demo in one command: health checks, dashboard, then Alfred (Claude, locked down) listening for voice.
 #   ./demo.sh                                   fake packs, macOS voice
 #   AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh     real arm through the IK service, VoiceStudio voice
 #   AGENT_DRY_RUN=1 ...                          plan every move, move nothing
-# Stop: say "Friday, stop", press STOP on the dashboard, or touch runs/agent/STOP. Ctrl-C ends Claude.
+# Stop: say "Alfred, stop", press STOP on the dashboard, or touch runs/agent/STOP. Ctrl-C ends Claude.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT"
@@ -28,6 +28,6 @@ if ! up http://127.0.0.1:8770/state; then
   for _ in $(seq 20); do up http://127.0.0.1:8770/state && break; sleep 0.25; done
 fi
 up http://127.0.0.1:8770/state || fail "dashboard did not start: see runs/agent/dashboard.log"
-echo "Dashboard: http://127.0.0.1:8770  (Chrome: press Hands-free, then say 'Friday, ...')"
+echo "Dashboard: http://127.0.0.1:8770  (Chrome: press Hands-free, then say 'Alfred, ...')"
 open http://127.0.0.1:8770 2>/dev/null || true
 AGENT_BUDGET=${AGENT_BUDGET:-2.00} exec operator/sorter/run.sh "Run in assistant mode: greet once, then listen for instructions."

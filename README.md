@@ -2,7 +2,7 @@
 
 Claude Code or Codex controls a robot arm by looking through its cameras, using NormaCore's Station API.
 
-The model chooses and verifies; code measures and moves. A daemon (`arm.py serve`) holds the robot (or a MuJoCo simulation) and enforces every safety limit. The model calls a small CLI or the MCP tools: `locate` numbers the objects it sees, `pick`/`place` grasp them, and `locate`/`look` confirm the result. A voice assistant, Friday, sits on top.
+The model chooses and verifies; code measures and moves. A daemon (`arm.py serve`) holds the robot (or a MuJoCo simulation) and enforces every safety limit. The model calls a small CLI or the MCP tools: `locate` numbers the objects it sees, `pick`/`place` grasp them, and `locate`/`look` confirm the result. A voice assistant, Alfred, sits on top.
 
 **New here? Open [`docs/field-guide.html`](docs/field-guide.html) in a browser first:** architecture, sequence diagrams, the pick pipeline, safety layers, results and what we tried.
 
@@ -60,10 +60,10 @@ ARM_SOCK=$PWD/runs/arm.sock .venv/bin/python arm.py serve --backend sim --seed 3
 ```
 How Codex is given permission for the socket is not verified yet; see `venue/VENUE.md`.
 
-## 4. Talk to Friday (voice assistant)
+## 4. Talk to Alfred (voice assistant)
 1. Start the daemon with a voice: `ARM_TTS=say` uses the built-in macOS voice. `ARM_TTS=voicestudio` uses the better voice if VoiceStudio runs locally on port 3900. `ARM_TTS=off` is silent.
 2. In `operator/`, start `claude --model haiku` and type: *Run in assistant mode.*
-3. In the live view, click **Hands-free** once and allow the microphone. Then speak: "Friday, put the red cube in the box." Only sentences with "Friday" reach her. "Friday, stop" freezes the arm. You can also type into the box and press Enter.
+3. In the live view, click **Hands-free** once and allow the microphone. Then speak: "Alfred, put the red cube in the box." Only sentences with "Alfred" reach her. "Alfred, stop" freezes the arm. You can also type into the box and press Enter.
 
 Use headphones: otherwise the microphone can hear her voice. Chrome sends microphone audio to Google for speech recognition.
 
@@ -71,7 +71,7 @@ Use headphones: otherwise the microphone can hear her voice. Chrome sends microp
 ```bash
 ./demo.sh                                        # fake packs, macOS voice
 ```
-It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Friday (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Friday, sort the table", or type into the box. "Friday, stop" or the STOP button freezes everything until RESUME.
+It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Alfred (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Alfred, sort the table", or type into the box. "Alfred, stop" or the STOP button freezes everything until RESUME.
 On the arm laptop: `AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh` (needs Station, the IK service and a filled `agent/config/`). Add `AGENT_DRY_RUN=1` the first time: it plans every move and moves nothing.
 
 ## 6. Daily workflow

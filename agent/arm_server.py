@@ -1,4 +1,4 @@
-"""Arm server for the ElevenLabs voice agent "Friday": one process owns the arm, picks run in a background thread (so the
+"""Arm server for the ElevenLabs voice agent "Alfred": one process owns the arm, picks run in a background thread (so the
 agent keeps listening and talking), and it serves the voice page plus the tool API on http://127.0.0.1:8772.
 
     .venv/bin/python agent/live_vision.py         # positions + labels (must run)

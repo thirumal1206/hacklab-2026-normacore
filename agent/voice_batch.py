@@ -1,4 +1,4 @@
-"""Voice-driven picking: say "Friday, ..." on the dashboard (http://127.0.0.1:8770, Hands-free) or type there.
+"""Voice-driven picking: say "Alfred, ..." on the dashboard (http://127.0.0.1:8770, Hands-free) or type there.
 
     .venv/bin/python agent/dashboard.py            # terminal 1: dashboard with the mic
     .venv/bin/python agent/live_vision.py          # terminal 2: live positions and Claude labels

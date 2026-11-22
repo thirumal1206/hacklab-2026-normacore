@@ -1,5 +1,5 @@
 """Voice control for batch_pick, without Claude: reads what the dashboard heard (runs/agent/inbox.jsonl, the words after
-"Friday") and turns fixed phrases into commands. Checked between every arm step, so a command acts within one step.
+"Alfred") and turns fixed phrases into commands. Checked between every arm step, so a command acts within one step.
 
     stop / wait / pause        pause (the arm holds where it is); the dashboard also sets the STOP file at once
     continue / resume / go on  resume at the same step
@@ -90,7 +90,7 @@ class Control:
         self.poll()
         if not real.STOP.exists() or self.abort:
             return
-        say("Paused. Say Friday, continue.")
+        say("Paused. Say Alfred, continue.")
         while real.STOP.exists() and not self.abort:
             time.sleep(0.1)
             seen = self.poll()

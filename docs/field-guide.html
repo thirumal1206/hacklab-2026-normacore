@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Friday Arm Field Guide</title>
+<title>Alfred Arm Field Guide</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -168,7 +168,7 @@ p { margin: 0; max-width: 68ch }
   <main>
     <section id="top" style="display:grid;gap:14px">
       <div class="eyebrow">HackLab Robotics × BRISA · NormaCore track · 21–22 Nov 2026</div>
-      <h1>Friday: an LLM that runs a robot arm by looking through its cameras</h1>
+      <h1>Alfred: an LLM that runs a robot arm by looking through its cameras</h1>
       <p class="lede">The model decides what to do and checks whether it worked. Ordinary code measures, plans the joint angles and keeps the arm safe. Everything below was built and measured in a MuJoCo simulation; the real arm is still untested.</p>
       <div class="facts">
         <div class="fact"><b>12/12</b><span>cubes boxed by fresh operators (3 runs)</span></div>
@@ -189,9 +189,9 @@ p { margin: 0; max-width: 68ch }
         <div class="arch">
           <div class="lane v">
             <div class="eyebrow">You</div>
-            <div class="node"><b>Live view</b><small>Browser page: latest camera image, command log, Friday's lines</small><span class="tag">arm.py view · :8766</span></div>
-            <div class="wire">"Friday, …" wake word</div>
-            <div class="node"><b>Hands-free mic</b><small>Browser speech recognition; echo filter drops Friday's own words</small></div>
+            <div class="node"><b>Live view</b><small>Browser page: latest camera image, command log, Alfred's lines</small><span class="tag">arm.py view · :8766</span></div>
+            <div class="wire">"Alfred, …" wake word</div>
+            <div class="node"><b>Hands-free mic</b><small>Browser speech recognition; echo filter drops Alfred's own words</small></div>
             <div class="node"><b>Speaker</b><small>VoiceStudio voice (af_heart), one line at a time, cut off when you talk</small></div>
           </div>
           <div class="lane m">
@@ -221,8 +221,8 @@ p { margin: 0; max-width: 68ch }
     <section class="plate" id="command">
       <header>
         <div class="eyebrow">Plate 2 · Sequence</div>
-        <h2>"Friday, put the red cube in the box"</h2>
-        <p>One spoken request, end to end. Friday narrates nothing; she says one line when the camera has confirmed the result.</p>
+        <h2>"Alfred, put the red cube in the box"</h2>
+        <p>One spoken request, end to end. Alfred narrates nothing; she says one line when the camera has confirmed the result.</p>
       </header>
       <div class="scroll"><div class="seq" id="seq1"></div></div>
     </section>
@@ -230,7 +230,7 @@ p { margin: 0; max-width: 68ch }
     <section class="plate" id="interrupt">
       <header>
         <div class="eyebrow">Plate 3 · Sequence</div>
-        <h2>Talking over her: "Friday, stop"</h2>
+        <h2>Talking over her: "Alfred, stop"</h2>
         <p>Hearing the wake word cuts her voice at once. A stop word freezes the arm in the middle of a move, and nothing moves again until the model has listened.</p>
       </header>
       <div class="scroll"><div class="seq" id="seq2"></div></div>
@@ -319,7 +319,7 @@ p { margin: 0; max-width: 68ch }
       </header>
       <div class="board">
         <div class="col ok"><h3>Works in simulation <span class="pill ok">measured</span></h3><ul>
-          <li>Locate, pick, place, recover from a knocked-out object</li><li>Non-cube objects: pen, cup, eraser, tape</li><li>Friday: hands-free, interruptible, refuses unsafe asks</li><li>MCP and CLI; Haiku at about $0.02 per task</li><li>Station client, VP8 frames, bus and calibration guards</li></ul></div>
+          <li>Locate, pick, place, recover from a knocked-out object</li><li>Non-cube objects: pen, cup, eraser, tape</li><li>Alfred: hands-free, interruptible, refuses unsafe asks</li><li>MCP and CLI; Haiku at about $0.02 per task</li><li>Station client, VP8 frames, bus and calibration guards</li></ul></div>
         <div class="col warn"><h3>Built, not proven <span class="pill warn">unverified</span></h3><ul>
           <li>ElRobot joint directions and gripper polarity</li><li>Camera calibration error on the printed sheet</li><li>Stall and overload hold on real servos</li><li>Echo filter with laptop speakers</li><li>Station on a Raspberry Pi over SSH</li></ul></div>
         <div class="col bad"><h3>Known gaps <span class="pill bad">open</span></h3><ul>
@@ -365,7 +365,7 @@ seq(document.getElementById("seq1"), [
   { n: "Claude", s: "operator", c: C.llm }, { n: "arm.py", s: "daemon", c: C.code },
   { n: "Station", s: ":8888", c: C.hw }, { n: "Speaker", s: "VoiceStudio", c: C.you }
 ], [
-  { f: 0, t: 1, m: '"Friday, put the red cube in the box"', c: C.you },
+  { f: 0, t: 1, m: '"Alfred, put the red cube in the box"', c: C.you },
   { f: 1, t: 1, m: "wake word → append to inbox", c: C.you },
   { f: 2, t: 3, m: "listen()", c: C.llm },
   { f: 3, t: 2, m: "instruction: put the red cube in the box", c: C.code },
@@ -390,7 +390,7 @@ seq(document.getElementById("seq2"), [
 ], [
   { f: 4, t: 2, m: "pick(id=blue) in progress", c: C.llm },
   { f: 2, t: 3, m: "goal ticks sent, arm moving", c: C.code },
-  { f: 0, t: 1, m: '"Friday, st…" (partial transcript)', c: C.you },
+  { f: 0, t: 1, m: '"Alfred, st…" (partial transcript)', c: C.you },
   { f: 1, t: 2, m: "hush (wake word heard)", c: C.you },
   { f: 2, t: 5, m: "cut the current line, drop the queue", c: C.code },
   { f: 1, t: 2, m: 'final: "stop" → inbox', c: C.you },
@@ -448,9 +448,9 @@ const steps = [
   ["20 Nov", "Codex as operator", "Its sandbox blocks the daemon's TCP port; a unix socket works. Login still pending.", "warn", "limits"],
   ["20 Nov", "Rust port of IK and segmentation", "IK 90× faster, segmentation 3× slower than OpenCV. Arm motion dominates, so not wired in.", "bad", "parked"],
   ["20 Nov", "VP8 camera frames", "Newer Station stores VP8; decoded with OpenCV's FFmpeg, no new package.", "ok", "kept"],
-  ["20 Nov", "Flat pencil", "0/10: jaw tips stop above it. Push moves it only 2–3 cm. Friday skips it after two tries.", "bad", "open"],
+  ["20 Nov", "Flat pencil", "0/10: jaw tips stop above it. Push moves it only 2–3 cm. Alfred skips it after two tries.", "bad", "open"],
   ["20 Nov", "Taught-grid fallback", "No kinematics needed; 8/10 in sim, same as IK.", "ok", "kept"],
-  ["20 Nov", "Friday: voice, wake word, interruptions", "Overlapping voices fixed with one speaker queue; stop freezes the arm mid-move.", "ok", "kept"],
+  ["20 Nov", "Alfred: voice, wake word, interruptions", "Overlapping voices fixed with one speaker queue; stop freezes the arm mid-move.", "ok", "kept"],
   ["20 Nov", "Token diet + Haiku", "$0.21 → $0.015 per session; spreading moved into code because Haiku ignored the rule.", "ok", "kept"],
   ["20 Nov", "Lean daemon for a Raspberry Pi", "812 → 492 MB; recommended split: Station on the Pi, everything else on the Mac.", "ok", "kept"],
   ["20 Nov", "Field learnings from earlier editions", "Bus pinning, calibration guard, slow servo profile, stall/overload hold, and a corrected ElRobot joint mapping.", "ok", "kept"]

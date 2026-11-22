@@ -41,7 +41,7 @@ def state():
     start = max((i for i, r in enumerate(rows) if r.get("session") == "start"), default=0)
     rows = rows[start:]  # current session only
     scan = json.loads((RUNS / "scan.json").read_text()) if (RUNS / "scan.json").exists() else {"packs": [], "bins": []}
-    said = []  # Friday's lines from the last 20 s: the page drops mic transcripts that echo them
+    said = []  # Alfred's lines from the last 20 s: the page drops mic transcripts that echo them
     if SAID.exists():
         for line in SAID.read_text().splitlines()[-20:]:
             r = json.loads(line)
@@ -127,7 +127,7 @@ td{padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}.why{colo
 .banner{grid-column:1/-1;background:#3d1214;border:1px solid var(--expired);color:#ffb4ae;padding:10px 14px;border-radius:8px;font-weight:600}
 </style></head><body>
 <header><div class="live" id="live"></div><div><h1>Pack Sorter</h1><div class="sub" id="sub">waiting for a session</div></div>
-<form id="talk"><button type="button" id="mic">🎙 Hands-free</button><input id="txt" placeholder="Type to Friday, Enter to send" autocomplete="off"></form>
+<form id="talk"><button type="button" id="mic">🎙 Hands-free</button><input id="txt" placeholder="Type to Alfred, Enter to send" autocomplete="off"></form>
 <button id="stop">STOP</button></header>
 <main><div class="tiles" id="tiles"></div><div id="banner" hidden class="banner"></div>
 <section><h2>Packs: what Claude read and decided</h2><div id="packs"></div></section>
@@ -140,7 +140,7 @@ const chip=b=>b?`<span class="chip" style="--c:${C[b]||"var(--accent)"}">${esc(b
 let stopped=false;
 document.getElementById("stop").onclick=async()=>{await fetch(stopped?"/resume":"/stop",{method:"POST"});tick()};
 function line(r){
-  if(r.event==="say")return{c:"#fff",cls:"say",h:`🗣 <b>Friday:</b> ${esc(r.text)}`};
+  if(r.event==="say")return{c:"#fff",cls:"say",h:`🗣 <b>Alfred:</b> ${esc(r.text)}`};
   if(r.event==="heard")return{c:"var(--recall)",cls:"you",h:`You: ${esc(r.text)}`};
   if(r.event==="scan")return{c:"var(--accent)",h:`Scanned the table: <b>${r.packs}</b> packs`};
   if(r.event==="inspect")return{c:"var(--accent)",h:`Read the label of <b>${esc(r.id)}</b>`+(r.image?`<img src="/img/${encodeURIComponent(r.image.split("/").pop())}">`:"")};
@@ -179,15 +179,15 @@ async function tick(){
   document.getElementById("feed").innerHTML=s.events.slice().reverse().map(r=>{const l=line(r);return l?`<div class="ev${l.veto?" veto":""}${l.cls?" "+l.cls:""}" style="--c:${l.c}"><div class="t">${esc((r.time||"").slice(11))}</div>${l.h}</div>`:""}).join("")||`<div class="empty">Nothing yet.</div>`}
 const send=t=>t&&fetch("/heard",{method:"POST",body:JSON.stringify({text:t})}).then(tick);
 document.getElementById("talk").onsubmit=e=>{e.preventDefault();const i=document.getElementById("txt");send(i.value.trim());i.value=""};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\bfriday\b[\s,.!?]*/i,mic=document.getElementById("mic");
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\balfred\b[\s,.!?]*/i,mic=document.getElementById("mic");
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,"").trim();let said="",hands=null;
-const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="friday"),s=new Set(norm(said).split(" "));
+const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="alfred"),s=new Set(norm(said).split(" "));
   return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
 if(!SR){mic.disabled=true;mic.title="No speech recognition in this browser: use Chrome, or type"}
 else mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove("on");mic.textContent="🎙 Hands-free";return}
   const r=new SR();r.lang="en-US";r.continuous=true;r.interimResults=true;hands=r;
-  mic.classList.add("on");mic.textContent='Listening: "Friday, ..."';
+  mic.classList.add("on");mic.textContent='Listening: "Alfred, ..."';
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
     if(!WAKE.test(t)||echo(t))continue;
     if(!e.results[i].isFinal){fetch("/hush",{method:"POST"});continue}  // barge-in on the wake word

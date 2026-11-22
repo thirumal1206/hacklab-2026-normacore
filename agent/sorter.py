@@ -59,7 +59,7 @@ def fingerprint():
 
 
 INBOX = RUNS / "inbox.jsonl"  # what people said or typed on the dashboard, one {"time","text"} per line
-HUSH = RUNS / "hush"  # touched by the dashboard when someone starts talking: cut Friday off
+HUSH = RUNS / "hush"  # touched by the dashboard when someone starts talking: cut Alfred off
 
 
 def norm(s):

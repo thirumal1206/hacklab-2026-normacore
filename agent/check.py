@@ -109,7 +109,7 @@ dashboard.heard("sort the table please")
 check("voice: listen returns what was said", v.listen(1)["instruction"] == "sort the table please")
 check("voice: nothing said -> null", v.listen(0.5)["instruction"] is None)
 check("voice: say is logged for the dashboard", v.say("Done.")["said"] == "Done." and '"event": "say"' in (RUNS / "proof.jsonl").read_text())
-dashboard.heard("Friday stop now")
+dashboard.heard("Alfred stop now")
 try:
     check("voice: a stop word freezes the tools at once", sorter.STOP.exists() and "stopped" in v.scan().get("error", ""))
     check("voice: listen reports the stop", v.listen(1)["stopped"])
