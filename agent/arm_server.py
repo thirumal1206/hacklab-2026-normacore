@@ -43,7 +43,7 @@ AGENT_FILE = real.CONFIG / "voice_agent.json"  # agent id (not a secret), writte
 PAGE_FILE = Path(__file__).resolve().parent / "voice_page.html"
 FEED_FILE = real.CONFIG / "feed_poses.json"  # candy + feed poses, taught by hand (follower FK, m and rad)
 FEED_HOVER_M = 0.06  # above the candy before going down
-FEED_SPEED = {"speed": 400, "accel": 30}  # ADJUST: slow moves near the person (normal 1500 / 100)
+FEED_SPEED = {"speed": 200, "accel": 15}  # ADJUST: slow moves near the person (normal 1500 / 100)
 FEED_DROP_WAIT_S = 1.5  # ADJUST: at the feed pose, wait this long, then open the jaws (candy drops into the mouth)
 
 
