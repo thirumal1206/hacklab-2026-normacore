@@ -25,6 +25,6 @@ smoke:
 station:
 	$(PY) scripts/station_logic.py
 
+# ponytail: agent/check_real.py tests the legacy slot sorter, broken since the free-pick motion change; run by hand if reviving it
 agent:
 	$(PY) agent/check.py
-	$(PY) agent/check_real.py

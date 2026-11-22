@@ -22,8 +22,8 @@ ALL = {  # name: (description, properties, required, method, path)
     "pick": ("Start picking these object ids into a bin (bin1..bin5). Returns at once; call wait for the result.",
              {"ids": {"type": "array", "items": N}, "bin": S}, ["ids"], "POST", "/api/pick"),
     "set_bin": ("Send the rest of the running pick to another bin.", {"bin": S}, ["bin"], "POST", "/api/bin"),
-    "feed": ("Take the candy from the taught spot and bring it slowly to the person's mouth, then drop it. "
-             "Returns at once; call wait for the result.", {}, [], "POST", "/api/feed"),
+    "feed": ("Pick this object id (any food vision sees; no id = the taught candy spot), bring it slowly to the "
+             "person's mouth, then drop it. Returns at once; call wait.", {"id": N}, [], "POST", "/api/feed"),
     "handover": ("Pick this object id and hold it out to the person (slowly). Returns at once; call wait. "
                  "Call release when the person says got it / thanks.", {"id": N}, ["id"], "POST", "/api/handover"),
     "release": ("Open the jaws while an object is held out to the person.", {}, [], "POST", "/api/release"),
