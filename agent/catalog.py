@@ -76,7 +76,8 @@ def match(color, width_cm, length_cm):
             continue
         w, l = sorted(o["size_cm"])
         dw, dl = abs(width_cm - w) / w, abs(length_cm - l) / l
-        if dw <= tol and dl <= tol and (best is None or dw + dl < best[0]):
+        t = float(o.get("tolerance", tol))  # per entry, else the catalog's
+        if dw <= t and dl <= t and (best is None or dw + dl < best[0]):
             best = (dw + dl, o["name"], o.get("category", "other"))
     return best and (best[1], best[2])
 

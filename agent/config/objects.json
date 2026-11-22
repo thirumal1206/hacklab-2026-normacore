@@ -2,9 +2,53 @@
  "_help": "Things that can be on the table. Teach entries with agent/catalog.py add (measures colour and size live). size_cm = [width, length] as live vision measures it.",
  "size_tolerance": 0.35,
  "objects": [
-  {"name": "red wrapped candy", "category": "candy", "colors": ["red", "orange"], "size_cm": [3.1, 8.9]},
-  {"name": "small red candy", "category": "candy", "colors": ["red", "orange"], "size_cm": [2.7, 3.1]},
-  {"name": "black battery pack", "category": "battery", "colors": ["black", "grey"], "size_cm": [5.9, 10.1]},
-  {"name": "green bottle cap", "category": "packaging", "colors": ["green"], "size_cm": [3.9, 4.0]}
+  {
+   "name": "red wrapped candy",
+   "category": "candy",
+   "colors": [
+    "red",
+    "orange"
+   ],
+   "size_cm": [
+    4.2,
+    9.1
+   ],
+   "tolerance": 0.4
+  },
+  {
+   "name": "small red candy",
+   "category": "candy",
+   "colors": [
+    "red",
+    "orange"
+   ],
+   "size_cm": [
+    2.7,
+    3.1
+   ]
+  },
+  {
+   "name": "black battery pack",
+   "category": "battery",
+   "colors": [
+    "black",
+    "grey"
+   ],
+   "size_cm": [
+    5.9,
+    10.1
+   ]
+  },
+  {
+   "name": "green bottle cap",
+   "category": "packaging",
+   "colors": [
+    "green"
+   ],
+   "size_cm": [
+    3.9,
+    4.0
+   ]
+  }
  ]
 }

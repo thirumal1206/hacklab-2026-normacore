@@ -1,19 +1,19 @@
 {
-  "camera_id": null,
+  "camera_id": "835446b047547e89f1f2e588eedf268b",
   "H_pixel_to_xy": [
     [
-      -8.262363107895187e-05,
-      0.008131495891953467,
-      -2.937994764887409
+      -6.447164924560747e-05,
+      0.003318847672483559,
+      -1.1323591365815588
     ],
     [
-      0.0048439416032247514,
-      0.0001268073828618656,
-      -3.2239053059894283
+      0.0021254378790938563,
+      0.0001455651929112976,
+      -1.4844432766874818
     ],
     [
-      0.0012919538513537427,
-      0.008188336810271271,
+      0.00013032022429077363,
+      0.0031026272012572103,
       1.0
     ]
   ],
@@ -21,18 +21,23 @@
     1280,
     960
   ],
-  "points": 7,
-  "rms_mm": 4.6,
-  "max_mm": 20.3,
-  "time": "2026-11-21 23:22",
-  "z_note": "jaw tips touching the table, pixel -> follower FK x, y (m)",
+  "points": 9,
+  "rms_mm": 2.8,
+  "max_mm": 10.0,
+  "loo_rms_mm": 5.5,
+  "model": "homography",
+  "quad_residual": null,
+  "time": "2026-11-22 09:45",
+  "z_note": "jaw tips touching pencil crosses (hand-guided, torque off), pixel and FK same session 22.11; pixel -> follower FK x, y (m)",
   "crosses_used": [
     "cross_1",
     "cross_2",
     "cross_3",
     "cross_4",
     "cross_5",
+    "cross_6",
     "cross_7",
+    "cross_8",
     "cross_9"
   ]
 }

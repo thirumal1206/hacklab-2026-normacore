@@ -12,7 +12,7 @@ import real
 
 PATH = real.CONFIG / "parallax.json"
 OBJECT_H_CM = 2.0  # ADJUST per object type: height of the top the camera sees (candy about 2 cm)
-FALLBACK_CM = (1.4, 0.1)  # constant offset measured 22.11 with the wrist camera (used without parallax.json)
+FALLBACK_CM = (-0.2, 0.55)  # measured 22.11 with the cap on the 9 crosses after the new calibration (used without parallax.json)
 _cache = {"mtime": None, "data": None}
 
 
