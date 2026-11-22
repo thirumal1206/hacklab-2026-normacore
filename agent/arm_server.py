@@ -16,7 +16,7 @@ The agent (created by create_voice_agent.py) calls these as client tools from th
     POST /api/handover {id}           pick that object and hold it out at the taught hand-over pose (slow)
     POST /api/release                 open the jaws while an object is held out ("got it"); else it goes back after 45 s
     .venv/bin/python agent/arm_server.py teach handover   save the follower's pose now as the hand-over pose
-    POST /api/feed                    candy from the taught spot to the person (config/feed_poses.json), slow near them
+    POST /api/feed   {id?}            that object (from vision) or the taught candy spot to the person, slow near them
     GET  /api/events?after=N          progress events for the page (and through it the agent)
     GET  /api/session                 signed ElevenLabs URL (key stays here, from .env)
 The page also sends a stop word straight to /api/stop, before the agent has thought about it. The STOP button and the
@@ -192,15 +192,24 @@ class Arm:
                   "gripper": real.jaw_goal() if gripper is None else gripper, "execute": True,
                   **{k: min(v, real.speed("empty")[k]) for k, v in FEED_SPEED.items()}}, timeout=60)
 
-    def feed(self):
+    def feed(self, obj_id=None):
+        """With an id: pick that object wherever vision sees it. Without: the taught candy spot."""
         if self.busy():
             return "Busy: a pick is running."
         if real.STOP.exists():
             return "Stopped: say continue first."
         poses = json.loads(FEED_FILE.read_text())
-        self.thread = threading.Thread(target=self._feed, args=(poses,), daemon=True)
+        if obj_id is None:
+            self.thread = threading.Thread(target=self._feed, args=(poses,), daemon=True)
+            self.thread.start()
+            return "Getting a candy for you."
+        o = self._seen(obj_id)
+        if isinstance(o, str):
+            return o
+        self.ctl = ServerControl(self.default_bin)
+        self.thread = threading.Thread(target=self._deliver, args=(o, poses["feed"], True), daemon=True)
         self.thread.start()
-        return "Getting a candy for you."
+        return f"Getting the {o.get('label') or 'food'} for you."
 
     def handover(self, obj_id):
         if self.busy():
@@ -210,17 +219,24 @@ class Arm:
         pose = json.loads(FEED_FILE.read_text()).get("handover")
         if not pose:
             return "No hand-over spot taught yet: arm_server.py teach handover."
+        o = self._seen(obj_id)
+        if isinstance(o, str):
+            return o
+        self.released.clear()
+        self.ctl = ServerControl(self.default_bin)
+        self.thread = threading.Thread(target=self._deliver, args=(o, pose, False), daemon=True)
+        self.thread.start()
+        return f"Getting the {o.get('label') or 'object'} for you."
+
+    def _seen(self, obj_id):
+        """The pickable object with this id from live vision, or the reason as a string."""
         w = live_vision.world()
         if w is None:
             return "Live vision is not running, I cannot see the table."
         o = next((o for o in w if str(o.get("id")) == str(obj_id)), None)
         if o is None or not o.get("pickable"):
-            return f"Cannot hand over {obj_id}: {'not on the table' if o is None else o.get('why')}."
-        self.released.clear()
-        self.ctl = ServerControl(self.default_bin)
-        self.thread = threading.Thread(target=self._handover, args=(o, pose), daemon=True)
-        self.thread.start()
-        return f"Getting the {o.get('label') or 'object'} for you."
+            return f"Cannot pick {obj_id}: {'not on the table' if o is None else o.get('why')}."
+        return o
 
     def release(self):
         if not self.busy():
@@ -228,7 +244,8 @@ class Arm:
         self.released.set()
         return "Releasing."
 
-    def _handover(self, o, pose):
+    def _deliver(self, o, pose, feed):
+        """Vision pick, slow move to the taught pose; feed drops after a pause, hand-over waits for release."""
         name = o.get("label") or "object"
         p = batch_pick.Picker(self.default_bin, self.ctl)
         g, none, held = p.g, p.none, False
@@ -250,6 +267,14 @@ class Arm:
             p.step("up", real.free_move, x, y, p.hover, rpy, "up", None, *none, loaded=True)
             self._slow(pose, "to the person")
             self.at_feed = True
+            if feed:
+                self.event("info", "Open your mouth.")
+                time.sleep(FEED_DROP_WAIT_S)
+                if real.STOP.exists():
+                    raise real.Stopped("stopped by a person before the drop")
+                real.grip(g["open"], at=pose)
+                self.event("done", f"Enjoy your {name}. Say go back when you are done.")
+                return
             self.event("info", f"Here is the {name}. Say got it when you have it.")
             end = time.time() + HANDOVER_WAIT_S
             while not self.released.is_set() and not self.ctl.abort and time.time() < end:
@@ -270,7 +295,7 @@ class Arm:
                 self._put_back(p, x, y, rpy, at)
             self.event("done", "Aborted." + (f" I put the {name} back." if held else ""))
         except (real.Stopped, real.Refused, RuntimeError, OSError) as e:
-            self.event("error", f"Hand-over stopped: {e}")
+            self.event("error", f"{'Feeding' if feed else 'Hand-over'} stopped: {e}")
         finally:
             real.DRY = not self.go
 
@@ -374,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/stop": ARM.stop, "/api/resume": ARM.resume, "/api/abort": ARM.abort, "/api/cancel": ARM.cancel,
             "/api/bin": lambda: ARM.set_bin(body.get("bin")),
             "/api/home": lambda: ARM.idle_move("home"),
-            "/api/feed": ARM.feed,
+            "/api/feed": lambda: ARM.feed(body.get("id")),
             "/api/handover": lambda: ARM.handover(body.get("id")),
             "/api/release": ARM.release,
             "/api/speed": lambda: f"Speed set to {round(real.set_scale(body.get('scale', 1.0)) * 100)} percent.",
