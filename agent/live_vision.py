@@ -8,7 +8,7 @@ Detection (no outlines, so a gap in an edge cannot lose an object):
   - background mode (runs/agent/background.jpg exists): object = differs from the empty-table photo
   - paper mode (default): object = coloured, clearly darker than the paper around it, or textured (print); glare ignored
   Thin drawn lines and tape crosses are removed by an opening filter; anything touching the paper border (mug, box,
-  the arm reaching in) is dropped. Pixels -> robot cm with robot_homography.json plus batch_pick.VISION_OFFSET_CM.
+  the arm reaching in) is dropped. Pixels -> robot cm with robot_homography.json plus parallax.correct.
 Tracking: a detection within MATCH_CM of a track updates it (averaged); a track is "confirmed" after CONFIRM sightings
 and dropped after DROP_S without one. Ids stay stable while an object stays put or moves a little.
 """
@@ -25,7 +25,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import batch_pick  # noqa: E402  (camera id, paper polygon, size and reach filters, height offset)
+import batch_pick  # noqa: E402  (camera id, paper polygon, size and reach filters)
+import parallax  # noqa: E402
 import real  # noqa: E402
 
 WORLD = real.RUNS / "world.json"
@@ -105,7 +106,7 @@ def detect(img, H, paper, poly):
             continue  # touches the paper border: mug, box, arm
         xy = cv2.perspectiveTransform(c.astype(np.float64), H).astype(np.float32) * 100
         (cx, cy), (w, l), ang = cv2.minAreaRect(xy)
-        cx, cy = cx + batch_pick.VISION_OFFSET_CM[0], cy + batch_pick.VISION_OFFSET_CM[1]
+        cx, cy = parallax.correct(cx, cy)  # object top above the table, per position
         long_axis = (ang + (90 if l > w else 0) + 90) % 180 - 90
         width, length = min(w, l), max(w, l)
         jaw = (long_axis + 90) % 180 if length > 1.1 * width else 0.0

@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import parallax  # noqa: E402
 import real  # noqa: E402
 import voice_ctl  # noqa: E402
 
@@ -43,9 +44,6 @@ REACH_CM = (8.0, 24.0)  # distance from the base axis
 MAX_WIDTH_CM = 6.0  # jaws open about 5 cm; outlines come out about 1 cm wider than the object (wings fan out)
 LENGTH_CM = (1.5, 12.0)  # shorter: tape cross or speck; longer: the drawn arc line
 MIN_WIDTH_CM = 1.5  # thinner: a piece of the drawn arc line
-# ADJUST per object height: the mapping is fitted on the table, a candy top is ~2 cm higher and the camera looks at it
-# from the +x side, so it appears closer to the base. Measured 22.11 with the wrist camera on 3 candies: x -1.3..-1.5 cm.
-VISION_OFFSET_CM = (1.4, 0.1)
 LIVE_WAIT_S = 1.2  # after home: arm out of the view, the tracker needs 3 frames (0.6 s at 5 Hz) to confirm
 SAME_SPOT_CM = 2.0  # an object this close to an earlier attempt is the same one (a miss)
 TRIES_PER_SPOT = 2
@@ -71,7 +69,7 @@ def vision_targets(drop):
     for outline in outlines:
         xy = cv2.perspectiveTransform(outline.astype(np.float64), H).astype(np.float32) * 100
         (cx, cy), (w, l), ang = cv2.minAreaRect(xy)
-        cx, cy = cx + VISION_OFFSET_CM[0], cy + VISION_OFFSET_CM[1]
+        cx, cy = parallax.correct(cx, cy)  # object top above the table, per position
         long_axis = (ang + (90 if l > w else 0) + 90) % 180 - 90  # Ash's convention: long axis, deg from +x to +y
         width, length = min(w, l), max(w, l)
         jaw = (long_axis + 90) % 180 if length > 1.1 * width else 0.0  # close across the long axis
