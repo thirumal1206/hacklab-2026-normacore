@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friday Voice</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1b1b1b;--mute:#6b6b6b;--line:#e3e1dc;--accent:#2457d6;--ok:#1f8a4c;--stop:#c62828;--warn:#b26a00}
+@media (prefers-color-scheme:dark){:root{--bg:#121212;--card:#1c1c1c;--ink:#ededed;--mute:#9a9a9a;--line:#2e2e2e;--accent:#7aa2ff;--ok:#4cc38a;--stop:#ff5a52;--warn:#f0a83a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px;display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+h1{font-size:20px;margin:0 12px 0 0}
+.pill{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.pill.on{color:var(--ok);border-color:var(--ok)}.pill.warn{color:var(--warn);border-color:var(--warn)}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 16px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+#stop{background:var(--stop);border-color:var(--stop);color:#fff;font-weight:700;font-size:18px;padding:14px 28px;margin-left:auto}
+#stop.resume{background:var(--ok);border-color:var(--ok)}
+.grid{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}#stop{margin-left:0;width:100%}}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:0 0 8px}
+#talk,#events{height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.msg{max-width:88%;padding:6px 10px;border-radius:10px;background:var(--bg);overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff}
+.ev{font-size:13px;color:var(--mute);overflow-wrap:anywhere}.ev b{color:var(--ink);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}.no{color:var(--mute)}
+#err{color:var(--stop);font-size:13px;min-height:1em}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Friday</h1>
+    <span class="pill" id="conn">disconnected</span>
+    <span class="pill" id="mode">idle</span>
+    <span class="pill" id="arm">arm idle</span>
+    <span class="pill warn" id="dry" hidden>dry run</span>
+  </header>
+  <div class="row">
+    <button class="primary" id="start">Start talking</button>
+    <button id="end" disabled>End</button>
+    <button id="mute" disabled>Mute mic</button>
+    <button id="stop">STOP</button>
+  </div>
+  <div id="err"></div>
+  <div class="grid">
+    <section><h2>Conversation</h2><div id="talk"></div></section>
+    <section><h2>Robot</h2><div id="events"></div></section>
+  </div>
+  <section><h2>Table (live vision)</h2><table id="objs"></table></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.35.0/dist/lib.iife.js" integrity="sha384-sUecpD4t4uadJZFqpJnSDeKxyARkn98eXj33hSiSFSPthBwaH/j1NH2P0XWYjw5K" crossorigin="anonymous"></script>
+<script>
+const $ = id => document.getElementById(id);
+const STOP_WORDS = /\b(stop|wait|pause|freeze|halt|hold on)\b/i;  // acted on at once, before the agent replies
+let conv = null, muted = false, lastSeq = 0, stopped = false;
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function addTalk(role, text) { const t = $("talk"); t.append(el("div", "msg " + role, text)); t.scrollTop = t.scrollHeight; }
+function addEvent(kind, text) {
+  const e = el("div", "ev"); e.append(el("b", null, kind + " "), document.createTextNode(text));
+  $("events").append(e); $("events").scrollTop = $("events").scrollHeight;
+}
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const j = await r.json(); return j.result || j.error || "ok";
+}
+async function getJSON(path) { return (await fetch(path, { cache: "no-store" })).json(); }
+
+// Client tools: names and parameters match create_voice_agent.py.
+const clientTools = {
+  get_objects: async () => {
+    const j = await getJSON("/api/objects");
+    if (j.error) return j.error;
+    return JSON.stringify({ busy: j.busy, stopped: j.stopped, objects: j.objects.map(o => ({
+      id: o.id, label: o.label || "unlabelled object", category: o.category, x_cm: o.x_cm, y_cm: o.y_cm,
+      size_cm: `${o.width_cm}x${o.length_cm}`, pickable: o.pickable, why: o.why })) });
+  },
+  pick_objects: async ({ ids, bin }) => {
+    const list = String(ids ?? "").split(/[^0-9]+/).filter(Boolean).map(Number);
+    return post("/api/pick", { ids: list, bin });
+  },
+  stop_arm: () => post("/api/stop"),
+  resume_arm: () => post("/api/resume"),
+  abort_pick: () => post("/api/abort"),
+  cancel_pick: () => post("/api/cancel"),
+  set_bin: ({ bin }) => post("/api/bin", { bin }),
+  go_home: () => post("/api/home"),
+  gripper: ({ action }) => post("/api/gripper", { action }),
+};
+
+async function start() {
+  $("err").textContent = ""; $("start").disabled = true;
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });  // ask for the mic inside the click
+    const s = await getJSON("/api/session");
+    if (!s.signedUrl) throw new Error(s.error || "no session");
+    conv = await ElevenLabsClient.Conversation.startSession({
+      signedUrl: s.signedUrl, clientTools,
+      onConnect: () => { $("conn").textContent = "connected"; $("conn").className = "pill on"; },
+      onDisconnect: () => { $("conn").textContent = "disconnected"; $("conn").className = "pill"; $("mode").textContent = "idle";
+        conv = null; $("start").disabled = false; $("end").disabled = true; $("mute").disabled = true; },
+      onModeChange: ({ mode }) => { $("mode").textContent = mode; $("mode").className = "pill" + (mode === "speaking" ? " on" : ""); },
+      onMessage: ({ message, role }) => {
+        addTalk(role === "user" ? "user" : "agent", message);
+        if (role === "user" && STOP_WORDS.test(message) && !/\b(don'?t|do not) stop\b/i.test(message)) post("/api/stop");
+      },
+      onError: (m) => { $("err").textContent = "Voice error: " + m; },
+    });
+    $("end").disabled = false; $("mute").disabled = false;
+  } catch (e) {
+    $("err").textContent = String(e.message || e); $("start").disabled = false;
+  }
+}
+
+$("start").onclick = start;
+$("end").onclick = () => conv && conv.endSession();
+$("mute").onclick = () => { if (!conv) return; muted = !muted; conv.setMicMuted(muted); $("mute").textContent = muted ? "Unmute mic" : "Mute mic"; };
+$("stop").onclick = async () => { addEvent("you", stopped ? "resume" : "STOP"); await post(stopped ? "/api/resume" : "/api/stop"); poll(); };
+
+async function poll() {
+  try {
+    const j = await getJSON("/api/events?after=" + lastSeq);
+    stopped = j.stopped;
+    $("stop").textContent = stopped ? "RESUME" : "STOP"; $("stop").className = stopped ? "resume" : "";
+    $("arm").textContent = stopped ? "arm stopped" : j.busy ? "arm picking" : "arm idle";
+    $("arm").className = "pill" + (stopped ? " warn" : j.busy ? " on" : "");
+    $("dry").hidden = !j.dry;
+    for (const e of j.events) {
+      lastSeq = Math.max(lastSeq, e.seq);
+      addEvent(e.kind, e.text);
+      if (!conv) continue;
+      if (e.kind === "done" || e.kind === "error") conv.sendUserMessage("EVENT: " + e.text);  // she reports it
+      else conv.sendContextualUpdate("Robot update: " + e.text);  // she knows, stays quiet
+    }
+  } catch (e) { $("arm").textContent = "arm server offline"; $("arm").className = "pill warn"; }
+}
+
+async function table() {
+  const t = $("objs");
+  try {
+    const j = await getJSON("/api/objects");
+    t.replaceChildren();
+    const h = el("tr"); ["id", "label", "category", "x cm", "y cm", "size cm", ""].forEach(x => h.append(el("th", null, x))); t.append(h);
+    for (const o of j.objects || []) {
+      const r = el("tr", o.pickable ? "" : "no");
+      [o.id, o.label || "...", o.category || "", o.x_cm, o.y_cm, `${o.width_cm} x ${o.length_cm}`, o.pickable ? "" : o.why]
+        .forEach((v, i) => r.append(el("td", i >= 3 && i <= 4 ? "n" : "", String(v ?? ""))));
+      t.append(r);
+    }
+    if (j.error) t.append(el("tr", "no", j.error));
+  } catch (e) { /* server restarting */ }
+}
+setInterval(poll, 400); setInterval(table, 1000); poll(); table();
+</script>
+</body>
+</html>

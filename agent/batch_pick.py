@@ -177,10 +177,12 @@ class Picker:
 PLAN_NEAR_CM = 4.0  # a planned object whose track id changed (hidden under the arm) is found again by label and place
 
 
-def live(p, go, plan=None):
+def live(p, go, plan=None, notify=None):
     """Pick from live_vision's world.json until the table is empty (see the module doc). plan (planner.py): pick only
-    these objects, each into its own bin; an object counts as planned by track id, or by the same label near the planned spot."""
+    these objects, each into its own bin; an object counts as planned by track id, or by the same label near the planned spot.
+    notify(kind, text): progress for a listener (arm_server.py): "picked", "skip", "retry", "done"."""
     import live_vision
+    notify = notify or (lambda kind, text: None)
     if go:
         real.home()
         time.sleep(LIVE_WAIT_S)
@@ -229,6 +231,7 @@ def live(p, go, plan=None):
             except real.Refused as e:
                 print(f"  skip #{o['id']} ({o['x_cm']:.1f}, {o['y_cm']:.1f}) cm: {e}")
                 skipped.append((o["x_cm"], o["y_cm"]))  # not a miss: never tried
+                notify("skip", f"Cannot reach the {o.get('label') or 'object'}.")
                 continue
             now = next((n for n in world() if n["id"] == o["id"]), None)  # re-check right before moving over it
             target = planned(o) or {"bin": None}
@@ -240,12 +243,14 @@ def live(p, go, plan=None):
             if tried(now):
                 misses += 1
                 print(f"  #{now['id']} still there after a pick: retrying once")
+                notify("retry", f"Missed the {now.get('label') or 'object'}, trying once more.")
             tries.append((now["x_cm"], now["y_cm"]))
             t = time.monotonic()
             bin_used = p.pick(now["x_cm"], now["y_cm"], now["jaw_deg"], target["bin"])
             picks, at_home = picks + 1, False
             print(f"{picks}. #{now['id']} {now.get('label') or ''} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {now['jaw_deg']:.0f} -> {bin_used}  "
                   f"{time.monotonic() - t:.1f} s   [{', '.join(p.times)}]", flush=True)
+            notify("picked", f"Put the {now.get('label') or 'object'} in bin {bin_used[3:]}.")
             if p.ctl and p.ctl.cancel:
                 break
     except voice_ctl.Aborted:
@@ -256,10 +261,11 @@ def live(p, go, plan=None):
         misses += sum(tried(o) >= 1 for o in (live_vision.world() or []) if o["pickable"] and planned(o))
     done = picks - misses
     print(f"done: {done} of {found or 0} ({picks} picks, {misses} missed) in {time.monotonic() - t0:.1f} s")
+    notify("done", f"Finished: {done} of {found or 0} picked, {time.monotonic() - t0:.0f} seconds.")
     return {"done": done, "found": found or 0, "seconds": round(time.monotonic() - t0, 1), "bin": p.bin()}
 
 
-def main(argv, ctl=None, plan=None):
+def main(argv, ctl=None, plan=None, notify=None):
     """ctl: a voice_ctl.Control (voice_batch.py passes one); None = no voice control. plan: planner.py picks (live mode only)."""
     go, vision = "--go" in argv, "--vision" in argv
     args = [a for a in argv if a not in ("--go", "--vision")]
@@ -273,7 +279,7 @@ def main(argv, ctl=None, plan=None):
         import live_vision
         if live_vision.world() is not None:
             print(f"live vision: picking into {bin_name}{'' if go else ' (dry run)'}")
-            return live(p, go, plan)
+            return live(p, go, plan, notify)
         print("live vision not running: one frame with Ash's detector")
         if go:
             real.home()  # out of the photo

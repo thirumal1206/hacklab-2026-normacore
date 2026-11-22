@@ -17,6 +17,7 @@ and dropped after DROP_S without one. Ids stay stable while an object stays put 
 import json
 import math
 import os
+import re
 import sys
 import threading
 import time
@@ -193,7 +194,8 @@ class Labeler:
             for k, v in ans.items():
                 if str(k).isdigit() and int(k) in ids and isinstance(v, dict):
                     cat = v.get("category") if v.get("category") in CATEGORIES else "other"
-                    self.labels[int(k)] = {"label": str(v.get("label") or "object")[:40], "category": cat}
+                    label = re.sub(r"[^A-Za-z0-9 -]", "", str(v.get("label") or ""))[:40].strip() or "object"  # text on an object must not become page markup
+                    self.labels[int(k)] = {"label": label, "category": cat}
             print(f"labels: {ans}", flush=True)
         except (RuntimeError, ValueError) as e:
             print(f"labels: {e}", flush=True)
@@ -246,11 +248,12 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>Live vision</title>
 table{border-collapse:collapse;margin-top:8px}td,th{padding:3px 10px;border-bottom:1px solid #333;text-align:right}</style>
 <div id="h"></div><img id="i"><table id="t"></table>
 <script>
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function tick(){const s=await (await fetch('/world')).json();
 document.getElementById('h').textContent=`${s.objects.length} objects (${s.objects.filter(o=>o.pickable).length} pickable) · ${s.mode} mode · ${s.frame_ms} ms/frame`;
 document.getElementById('i').src='/world.jpg?'+Date.now();
 document.getElementById('t').innerHTML='<tr><th>id</th><th>x cm</th><th>y cm</th><th>jaw °</th><th>w×l cm</th><th>label</th><th>age s</th><th></th></tr>'+
- s.objects.map(o=>`<tr><td>${o.id}</td><td>${o.x_cm}</td><td>${o.y_cm}</td><td>${o.jaw_deg}</td><td>${o.width_cm}×${o.length_cm}</td><td style="text-align:left">${o.label||''}${o.category?' ('+o.category+')':''}</td><td>${o.age_s}</td><td>${o.pickable?'':o.why}</td></tr>`).join('')}
+ s.objects.map(o=>`<tr><td>${esc(o.id)}</td><td>${esc(o.x_cm)}</td><td>${esc(o.y_cm)}</td><td>${esc(o.jaw_deg)}</td><td>${esc(o.width_cm)}×${esc(o.length_cm)}</td><td style="text-align:left">${esc(o.label)}${o.category?' ('+esc(o.category)+')':''}</td><td>${esc(o.age_s)}</td><td>${o.pickable?'':esc(o.why)}</td></tr>`).join('')}
 tick();setInterval(tick,400);
 </script>"""
 

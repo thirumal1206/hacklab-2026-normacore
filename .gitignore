@@ -28,3 +28,6 @@ watch_mem.sh
 # venue/elrobot/ik-calib: local env and capture photos
 venue/elrobot/ik-calib/.env
 venue/elrobot/ik-calib/logs/
+
+# local secrets (ElevenLabs key for the voice agent)
+.env
