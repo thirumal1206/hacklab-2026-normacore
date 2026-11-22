@@ -78,7 +78,7 @@ const clientTools = {
     const j = await getJSON("/api/objects");
     if (j.error) return j.error;
     return JSON.stringify({ busy: j.busy, stopped: j.stopped, objects: j.objects.map(o => ({
-      id: o.id, label: o.label || "unlabelled object", category: o.category, x_cm: o.x_cm, y_cm: o.y_cm,
+      id: o.id, label: o.label || "unlabelled object", category: o.category, color: o.color, x_cm: o.x_cm, y_cm: o.y_cm,
       size_cm: `${o.width_cm}x${o.length_cm}`, pickable: o.pickable, why: o.why })) });
   },
   pick_objects: async ({ ids, bin }) => {

@@ -9,8 +9,9 @@ Detection (no outlines, so a gap in an edge cannot lose an object):
   - paper mode (default): object = coloured, clearly darker than the paper around it, or textured (print); glare ignored
   Thin drawn lines and tape crosses are removed by an opening filter; anything touching the paper border (mug, box,
   the arm reaching in) is dropped. Pixels -> robot cm with robot_homography.json plus parallax.correct.
-Labels (LABELS=off disables): objects that stay put LABEL_AFTER_S get a short label and category from Claude (one marked
-image per batch, in a background thread, claude_cli.MODEL_LABEL), kept per track id; the 5 Hz loop never waits for it.
+Labels: instant from the object catalog (config/objects.json, colour + size, see catalog.py). Objects that stay put
+LABEL_AFTER_S are also checked by Claude (LABELS=off disables) on a sheet of zoomed crops, choosing a catalog name; kept per
+track id, in a background thread, so the 5 Hz loop never waits for it.
 Tracking: a detection within MATCH_CM of a track updates it (averaged); a track is "confirmed" after CONFIRM sightings
 and dropped after DROP_S without one. Ids stay stable while an object stays put or moves a little.
 """
@@ -29,6 +30,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import batch_pick  # noqa: E402  (camera id, paper polygon, size and reach filters)
+import catalog  # noqa: E402
 import claude_cli  # noqa: E402
 import parallax  # noqa: E402
 import real  # noqa: E402
@@ -51,6 +53,7 @@ FRESH_S = 0.5  # world.json lists only objects seen this recently (no ghosts of 
 TEXTURE_MIN = 14  # paper mode: printed wrappers are busy, paper is smooth (blurred |Laplacian|)
 LABEL_AFTER_S = 1.5  # an object must stay this long before it is labelled (not a hand passing by)
 LABEL_TRIES = 2
+LABEL_BATCH = 8  # objects per Claude call (one sheet of zoomed tiles)
 LABEL_FRAME = real.RUNS / "label_frame.jpg"
 CATEGORIES = ("candy", "battery", "pen", "tool", "food", "packaging", "toy", "other")
 BG_DELTA = 35  # background mode: colour difference that counts
@@ -118,7 +121,8 @@ def detect(img, H, paper, poly):
         long_axis = (ang + (90 if l > w else 0) + 90) % 180 - 90
         width, length = min(w, l), max(w, l)
         jaw = (long_axis + 90) % 180 if length > 1.1 * width else 0.0
-        d = {"x_cm": cx, "y_cm": cy, "jaw_deg": jaw, "width_cm": width, "length_cm": length, "contour": c}
+        d = {"x_cm": cx, "y_cm": cy, "jaw_deg": jaw, "width_cm": width, "length_cm": length, "contour": c,
+             "color": catalog.color_name(img, c)}
         out.append(judge(d))
     return out
 
@@ -149,17 +153,20 @@ class Tracker:
                 t[k] = (1 - ALPHA) * t[k] + ALPHA * d[k]
             dj = (d["jaw_deg"] - t["jaw_deg"] + 90) % 180 - 90  # average angles modulo 180
             t["jaw_deg"] = (t["jaw_deg"] + ALPHA * dj) % 180
-            t.update(hits=t["hits"] + 1, seen=now, contour=d["contour"])
+            t["votes"][d["color"]] = t["votes"].get(d["color"], 0) + 1  # colour by majority: no flicker
+            t.update(hits=t["hits"] + 1, seen=now, contour=d["contour"], color=max(t["votes"], key=t["votes"].get))
             judge(t)  # on the averaged size: no flicker at a limit
         for i in free:
-            self.tracks.append({**dets[i], "id": self.next_id, "hits": 1, "first": now, "seen": now})
+            self.tracks.append({**dets[i], "id": self.next_id, "hits": 1, "first": now, "seen": now, "votes": {dets[i]["color"]: 1}})
             self.next_id += 1
         self.tracks = [t for t in self.tracks if now - t["seen"] <= DROP_S]
         return [t for t in self.tracks if t["hits"] >= CONFIRM]
 
 
 class Labeler:
-    """Claude labels for confirmed tracks, one call at a time in a background thread."""
+    """Labels per track id. Instant: the catalog entry matching colour and size (catalog.py). In the background, one
+    Claude call at a time checks objects that stay put on a sheet of zoomed crops and picks a catalog name; its answer
+    wins. The 5 Hz loop never waits for it."""
 
     def __init__(self):
         self.labels, self.tries, self.busy = {}, {}, False
@@ -169,48 +176,73 @@ class Labeler:
         if not self.enabled or self.busy:
             return
         todo = [t for t in objs if t["id"] not in self.labels and self.tries.get(t["id"], 0) < LABEL_TRIES
-                and now - t["first"] >= LABEL_AFTER_S and now - t["seen"] <= FRESH_S]
+                and now - t["first"] >= LABEL_AFTER_S and now - t["seen"] <= FRESH_S][:LABEL_BATCH]
         if not todo:
             return
-        x, y, w, h = cv2.boundingRect(poly)
-        vis = img.copy()
         for t in todo:
-            cv2.drawContours(vis, [t["contour"]], -1, (0, 220, 0), 2)
-            u, v = t["contour"][:, 0, :].max(0)
-            cv2.putText(vis, str(t["id"]), (int(u) + 4, int(v) + 4), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 0), 5)
-            cv2.putText(vis, str(t["id"]), (int(u) + 4, int(v) + 4), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 255), 2)
             self.tries[t["id"]] = self.tries.get(t["id"], 0) + 1
-        cv2.imwrite(str(LABEL_FRAME), vis[max(0, y - 20):y + h + 20, max(0, x - 20):x + w + 20])
+        cv2.imwrite(str(LABEL_FRAME), crop_sheet(img, todo))
         self.busy = True
         threading.Thread(target=self._ask, args=([t["id"] for t in todo],), daemon=True).start()
 
     def _ask(self, ids):
-        prompt = (f"Read the image {LABEL_FRAME}. It shows a table seen from above; green outlines with yellow numbers mark "
-                  f"objects {', '.join(map(str, ids))}. For each number give a short label (colour + kind of object, at most "
-                  f"4 words) and one category from: {', '.join(CATEGORIES)}. Answer ONLY with JSON like "
+        known = catalog.names()
+        choose = (f"Choose each name from this list if it fits: {'; '.join(known)}. If none fits, give a short new label "
+                  f"(colour + kind of object, at most 4 words). " if known else
+                  "Give each a short label (colour + kind of object, at most 4 words). ")
+        prompt = (f"The image shows objects on a table seen from above, one zoomed tile per object, "
+                  f"each with its number {', '.join(map(str, ids))} in yellow at the top left and a green outline. {choose}"
+                  f"Also give one category from: {', '.join(CATEGORIES)}. Answer ONLY with JSON like "
                   '{"3": {"label": "red wrapped candy", "category": "candy"}}.')
         try:
-            ans = claude_cli.ask_json(prompt, claude_cli.MODEL_LABEL, tools="Read", timeout=90)
+            t0 = time.monotonic()
+            ans = claude_cli.ask_image_json(prompt, LABEL_FRAME, claude_cli.MODEL_LABEL, timeout=60)
             for k, v in ans.items():
                 if str(k).isdigit() and int(k) in ids and isinstance(v, dict):
-                    cat = v.get("category") if v.get("category") in CATEGORIES else "other"
                     label = re.sub(r"[^A-Za-z0-9 -]", "", str(v.get("label") or ""))[:40].strip() or "object"  # text on an object must not become page markup
-                    self.labels[int(k)] = {"label": label, "category": cat}
-            print(f"labels: {ans}", flush=True)
+                    cat = catalog.category(label) or (v.get("category") if v.get("category") in CATEGORIES else "other")
+                    self.labels[int(k)] = {"label": label, "category": cat, "label_by": "claude"}
+            print(f"labels ({time.monotonic() - t0:.1f} s): {ans}", flush=True)
         except (RuntimeError, ValueError) as e:
             print(f"labels: {e}", flush=True)
         finally:
             self.busy = False
 
-    def get(self, i):
-        return self.labels.get(i, {"label": None, "category": None})
+    def get(self, t):
+        if t["id"] in self.labels:
+            return self.labels[t["id"]]
+        m = catalog.match(t.get("color"), t["width_cm"], t["length_cm"])
+        return {"label": m[0], "category": m[1], "label_by": "catalog"} if m else {"label": None, "category": None, "label_by": None}
+
+
+def crop_sheet(img, tracks, tile=320):
+    """One zoomed tile per track (outline in green, id in yellow), side by side, up to 4 per row."""
+    tiles = []
+    for t in tracks:
+        x, y, w, h = cv2.boundingRect(t["contour"])
+        pad = max(20, int(0.25 * max(w, h)))
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        vis = img.copy()
+        cv2.drawContours(vis, [t["contour"]], -1, (0, 220, 0), 1)
+        c = vis[y0:y + h + pad, x0:x + w + pad]
+        k = tile / max(c.shape[:2])
+        c = cv2.resize(c, (int(c.shape[1] * k), int(c.shape[0] * k)))
+        cell = np.full((tile, tile, 3), 255, np.uint8)
+        cell[:c.shape[0], :c.shape[1]] = c
+        cv2.putText(cell, str(t["id"]), (6, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 6)
+        cv2.putText(cell, str(t["id"]), (6, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
+        tiles.append(cv2.copyMakeBorder(cell, 4, 4, 4, 4, cv2.BORDER_CONSTANT, value=(80, 80, 80)))
+    blank = np.zeros_like(tiles[0])
+    rows = [tiles[i:i + 4] for i in range(0, len(tiles), 4)]
+    return np.vstack([np.hstack(r + [blank] * (4 - len(r))) if len(rows) > 1 else np.hstack(r) for r in rows])
 
 
 def state(objs, now, ms, labeler=None):
     return {"time": now, "frame_ms": round(ms), "mode": "background" if BACKGROUND.exists() else "paper",
             "objects": [{"id": t["id"], "x_cm": round(t["x_cm"], 1), "y_cm": round(t["y_cm"], 1), "jaw_deg": round(t["jaw_deg"], 1),
                          "width_cm": round(t["width_cm"], 1), "length_cm": round(t["length_cm"], 1), "pickable": t["pickable"],
-                         "why": t["why"], **(labeler.get(t["id"]) if labeler else {"label": None, "category": None}),
+                         "why": t["why"], "color": t.get("color"),
+                         **(labeler.get(t) if labeler else {"label": None, "category": None, "label_by": None}),
                          "age_s": round(now - t["first"], 1), "seen_s_ago": round(now - t["seen"], 2)}
                         for t in sorted(objs, key=lambda t: t["id"]) if now - t["seen"] <= FRESH_S]}
 
@@ -222,7 +254,7 @@ def draw(img, poly, objs, labeler=None):
         col = (0, 200, 0) if t["pickable"] else (0, 0, 255)
         cv2.drawContours(vis, [t["contour"]], -1, col, 2)
         u, v = t["contour"][:, 0, :].mean(0).astype(int)
-        name = labeler.get(t["id"])["label"] if labeler else None
+        name = labeler.get(t)["label"] if labeler else None
         label = f"{t['id']}: {name or ''} {t['x_cm']:.1f},{t['y_cm']:.1f}" + ("" if t["pickable"] else f" {t['why']}")
         cv2.putText(vis, label, (int(u) + 12, int(v) - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0) if t["pickable"] else col, 2)
     return vis

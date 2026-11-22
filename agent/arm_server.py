@@ -83,7 +83,7 @@ class Arm:
         w = live_vision.world()
         if w is None:
             return None
-        return [{k: o.get(k) for k in ("id", "label", "category", "x_cm", "y_cm", "width_cm", "length_cm", "pickable", "why")}
+        return [{k: o.get(k) for k in ("id", "label", "category", "color", "x_cm", "y_cm", "width_cm", "length_cm", "pickable", "why")}
                 for o in w]
 
     def pick(self, ids, bin_name):
