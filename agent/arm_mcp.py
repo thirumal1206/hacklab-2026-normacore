@@ -1,7 +1,7 @@
 """MCP server (stdio, stdlib only) over arm_server.py: one arm, the pack picks the job.
 
     .venv/bin/python agent/arm_server.py [--go]     # owns the arm and its safety
-    claude mcp add feeder -e PACK=feeder -- /path/to/.venv/bin/python /path/to/agent/arm_mcp.py
+    claude mcp add feeder -e PACK=assist -- /path/to/.venv/bin/python /path/to/agent/arm_mcp.py
 PACK selects operator/packs/<PACK>/pack.json (tools + instructions). No motion code here: every tool is an HTTP call.
 """
 import json
@@ -13,7 +13,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 BASE = f"http://127.0.0.1:{os.environ.get('ARM_SERVER_PORT', '8772')}"
-PACK_DIR = REPO / "operator" / "packs" / os.environ.get("PACK", "feeder")
+PACK_DIR = REPO / "operator" / "packs" / os.environ.get("PACK", "assist")
 PACK = json.loads((PACK_DIR / "pack.json").read_text())
 
 S, N = {"type": "string"}, {"type": "number"}
@@ -24,6 +24,9 @@ ALL = {  # name: (description, properties, required, method, path)
     "set_bin": ("Send the rest of the running pick to another bin.", {"bin": S}, ["bin"], "POST", "/api/bin"),
     "feed": ("Take the candy from the taught spot and bring it slowly to the person's mouth, then drop it. "
              "Returns at once; call wait for the result.", {}, [], "POST", "/api/feed"),
+    "handover": ("Pick this object id and hold it out to the person (slowly). Returns at once; call wait. "
+                 "Call release when the person says got it / thanks.", {"id": N}, ["id"], "POST", "/api/handover"),
+    "release": ("Open the jaws while an object is held out to the person.", {}, [], "POST", "/api/release"),
     "home": ("Move the arm home (slowly if it is near the person). Use on 'go back'.", {}, [], "POST", "/api/home"),
     "stop": ("Pause the arm where it is.", {}, [], "POST", "/api/stop"),
     "resume": ("Continue after a stop.", {}, [], "POST", "/api/resume"),
@@ -69,7 +72,7 @@ def run_tool(name, a):
     _, _, _, method, path = TOOLS[name]
     if name == "wait":
         return wait(a.get("wait_s", 60))
-    if method == "POST" and name in ("pick", "feed"):  # report only what this action causes
+    if method == "POST" and name in ("pick", "feed", "handover"):  # report only what this action causes
         seen = max([seen] + [e["seq"] for e in http("GET", f"/api/events?after={seen}")["events"]])
     return http(method, path, a)
 

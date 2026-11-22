@@ -13,6 +13,9 @@ The agent (created by create_voice_agent.py) calls these as client tools from th
     POST /api/bin    {bin}            later objects of the running pick go there
     POST /api/gripper {action: open|close}
     POST /api/speed  {scale}          live speed factor 0.2-1.0 on motion.json speeds (feed never above FEED_SPEED)
+    POST /api/handover {id}           pick that object and hold it out at the taught hand-over pose (slow)
+    POST /api/release                 open the jaws while an object is held out ("got it"); else it goes back after 45 s
+    .venv/bin/python agent/arm_server.py teach handover   save the follower's pose now as the hand-over pose
     POST /api/feed                    candy from the taught spot to the person (config/feed_poses.json), slow near them
     GET  /api/events?after=N          progress events for the page (and through it the agent)
     GET  /api/session                 signed ElevenLabs URL (key stays here, from .env)
@@ -44,6 +47,7 @@ PAGE_FILE = Path(__file__).resolve().parent / "voice_page.html"
 FEED_FILE = real.CONFIG / "feed_poses.json"  # candy + feed poses, taught by hand (follower FK, m and rad)
 FEED_HOVER_M = 0.06  # above the candy before going down
 FEED_SPEED = {"speed": 200, "accel": 15}  # ADJUST: slow moves near the person (normal 1500 / 100)
+HANDOVER_WAIT_S = 45  # ADJUST: hold the object out this long for a "got it", then put it back
 FEED_DROP_WAIT_S = 1.5  # ADJUST: at the feed pose, wait this long, then open the jaws (candy drops into the mouth)
 
 
@@ -74,6 +78,7 @@ class Arm:
     def __init__(self, go):
         self.go, self.lock, self.thread, self.ctl = go, threading.Lock(), None, None
         self.events, self.seq, self.default_bin = deque(maxlen=200), 0, "bin1"
+        self.released = threading.Event()  # set by /api/release while an object is held out
         self.at_feed = False  # arm is at the feed pose (near the person): go home slowly
         voice_ctl.say = lambda text: self.event("info", text)  # batch_pick's spoken lines become events
 
@@ -197,6 +202,85 @@ class Arm:
         self.thread.start()
         return "Getting a candy for you."
 
+    def handover(self, obj_id):
+        if self.busy():
+            return "Busy: a pick is running."
+        if real.STOP.exists():
+            return "Stopped: say continue first."
+        pose = json.loads(FEED_FILE.read_text()).get("handover")
+        if not pose:
+            return "No hand-over spot taught yet: arm_server.py teach handover."
+        w = live_vision.world()
+        if w is None:
+            return "Live vision is not running, I cannot see the table."
+        o = next((o for o in w if str(o.get("id")) == str(obj_id)), None)
+        if o is None or not o.get("pickable"):
+            return f"Cannot hand over {obj_id}: {'not on the table' if o is None else o.get('why')}."
+        self.released.clear()
+        self.ctl = ServerControl(self.default_bin)
+        self.thread = threading.Thread(target=self._handover, args=(o, pose), daemon=True)
+        self.thread.start()
+        return f"Getting the {o.get('label') or 'object'} for you."
+
+    def release(self):
+        if not self.busy():
+            return "Nothing to release."
+        self.released.set()
+        return "Releasing."
+
+    def _handover(self, o, pose):
+        name = o.get("label") or "object"
+        p = batch_pick.Picker(self.default_bin, self.ctl)
+        g, none, held = p.g, p.none, False
+        try:
+            a = p.solvable(o["x_cm"], o["y_cm"], o["jaw_deg"])
+            x, y, rpy = o["x_cm"] / 100, o["y_cm"] / 100, p.rpy(a)
+            at = dict(zip(("x", "y", "z", "roll", "pitch", "yaw"), (x, y, p.zg, *rpy)))
+            if not real.DRY:
+                real.set_jaw(g["open"])
+            p.step("hover", real.free_move, x, y, p.hover, rpy, "hover", None, *none)
+            p.step("down", real.free_move, x, y, p.zg, rpy, "down", None, *none)
+            opening = p.step("close", real.grip, g["close"], settle=False, at=at)
+            if opening is not None and opening < g["empty_below"]:
+                real.grip(g["open"], at=at)
+                real.free_move(x, y, p.hover, rpy, "up", None, *none)
+                self.event("done", f"I missed the {name}.")
+                return
+            held = True
+            p.step("up", real.free_move, x, y, p.hover, rpy, "up", None, *none, loaded=True)
+            self._slow(pose, "to the person")
+            self.at_feed = True
+            self.event("info", f"Here is the {name}. Say got it when you have it.")
+            end = time.time() + HANDOVER_WAIT_S
+            while not self.released.is_set() and not self.ctl.abort and time.time() < end:
+                time.sleep(0.1)
+            if self.released.is_set():
+                real.grip(g["open"], at=pose)
+                self.event("done", "There you go. Say go back when you are done.")
+                return
+            why = "Aborted" if self.ctl.abort else "Nobody took it"
+            real.STOP.unlink(missing_ok=True)
+            self._slow({**at, "z": p.hover}, "back above its spot")
+            self.at_feed = False
+            self._put_back(p, x, y, rpy, at)
+            self.event("done", f"{why}, so I put the {name} back.")
+        except voice_ctl.Aborted:
+            real.STOP.unlink(missing_ok=True)
+            if held:
+                self._put_back(p, x, y, rpy, at)
+            self.event("done", "Aborted." + (f" I put the {name} back." if held else ""))
+        except (real.Stopped, real.Refused, RuntimeError, OSError) as e:
+            self.event("error", f"Hand-over stopped: {e}")
+        finally:
+            real.DRY = not self.go
+
+    def _put_back(self, p, x, y, rpy, at):
+        real.free_move(x, y, p.hover, rpy, "put back hover", None, *p.none, loaded=True)
+        real.free_move(x, y, p.zg, rpy, "put back down", None, *p.none, loaded=True)
+        real.grip(p.g["open"], at=at)
+        real.free_move(x, y, p.hover, rpy, "put back up", None, *p.none)
+        real.home()
+
     def _feed(self, poses):
         try:
             g = real.cfg("motion.json")["grasp"]
@@ -291,6 +375,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/bin": lambda: ARM.set_bin(body.get("bin")),
             "/api/home": lambda: ARM.idle_move("home"),
             "/api/feed": ARM.feed,
+            "/api/handover": lambda: ARM.handover(body.get("id")),
+            "/api/release": ARM.release,
             "/api/speed": lambda: f"Speed set to {round(real.set_scale(body.get('scale', 1.0)) * 100)} percent.",
             "/api/gripper": lambda: ARM.idle_move("open" if body.get("action") == "open" else "close"),
         }
@@ -303,8 +389,18 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, {"result": f"That did not work: {e}"})
 
 
+def teach(name):
+    import record_points
+    poses = json.loads(FEED_FILE.read_text())
+    poses[name] = record_points.still_pose()
+    FEED_FILE.write_text(json.dumps(poses, indent=1) + "\n")
+    print(f"{name}: {poses[name]}")
+
+
 def main(argv):
     global ARM
+    if argv[:1] == ["teach"]:
+        return teach(argv[1] if len(argv) > 1 else "handover")
     go = "--go" in argv
     real.DRY = not go
     ARM = Arm(go)
