@@ -23,11 +23,10 @@ claude mcp add table -e PACK=table -- $PWD/.venv/bin/python $PWD/agent/arm_mcp.p
 ```
 Then in Claude: *"Alfred, tidy my desk: pens left, snacks right."* The voice page on http://127.0.0.1:8772 (ElevenLabs) works beside it. Saying "stop", the STOP button and the 12 V plug always work. Details: [`operator/packs/README.md`](operator/packs/README.md).
 
-The sections below cover setup and the MuJoCo simulation we started from.
 
 **Visual overview:** open [`docs/field-guide.html`](docs/field-guide.html) in a browser.
 
-## 1. One-time setup (macOS)
+## Setup (macOS)
 You need [Homebrew](https://brew.sh). Then, in a terminal:
 
 ```bash
@@ -42,7 +41,10 @@ make check                                     # must end with: ALL CHECKS PASSE
 
 For the robot operator you also need **Claude Code** (`claude`) or **Codex**, each logged in with your own account.
 
-## 2. Run the simulation
+## Earlier work: simulation and pack sorter
+Where we started: a MuJoCo simulation, a CLI and MCP tools, and a pharmacy pack sorter. Kept for reference; Alfred does not need them.
+
+### Run the simulation
 Open three terminal tabs, all in the repo folder.
 
 **Tab 1: the robot** (a simulated SO-101 arm, four cubes and a box):
@@ -67,7 +69,7 @@ Open http://127.0.0.1:8766 in Chrome. It stays empty until the first command run
 ```
 `.venv/bin/python arm.py --help` lists every command.
 
-## 3. Let the model drive
+### Let the model drive
 **Claude Code** (recommended: Haiku is fast and cheap):
 ```bash
 cd operator
@@ -81,21 +83,21 @@ ARM_SOCK=$PWD/runs/arm.sock .venv/bin/python arm.py serve --backend sim --seed 3
 ```
 How Codex is given permission for the socket is not verified yet; see `venue/VENUE.md`.
 
-## 4. Talk to Alfred (voice assistant)
+### Talk to Alfred (voice assistant)
 1. Start the daemon with a voice: `ARM_TTS=say` uses the built-in macOS voice. `ARM_TTS=voicestudio` uses the better voice if VoiceStudio runs locally on port 3900. `ARM_TTS=off` is silent.
 2. In `operator/`, start `claude --model haiku` and type: *Run in assistant mode.*
 3. In the live view, click **Hands-free** once and allow the microphone. Then speak: "Alfred, put the red cube in the box." Only sentences with "Alfred" reach her. "Alfred, stop" freezes the arm. You can also type into the box and press Enter.
 
 Use headphones: otherwise the microphone can hear her voice. Chrome sends microphone audio to Google for speech recognition.
 
-## 5. Pack sorter demo (dashboard + voice + Claude, one command)
+### Pack sorter demo (dashboard + voice + Claude, one command)
 ```bash
 ./demo.sh                                        # fake packs, macOS voice
 ```
 It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Alfred (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Alfred, sort the table", or type into the box. "Alfred, stop" or the STOP button freezes everything until RESUME.
 On the arm laptop: `AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh` (needs Station, the IK service and a filled `agent/config/`). Add `AGENT_DRY_RUN=1` the first time: it plans every move and moves nothing.
 
-## 6. Daily workflow
+## Daily workflow
 ```bash
 git switch main && git pull && uv sync         # start of the day
 git switch -c feat/<topic>                     # one branch per change

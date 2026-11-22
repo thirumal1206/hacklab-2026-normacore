@@ -64,4 +64,4 @@ make check            # compile, ElRobot kinematics, selfcheck, sim grasp smoke 
 Env: `ARM_PORT` (default 8765), `ARM_SOCK` (unix socket, for Codex's sandbox), `ARM_SIGN`/`ARM_GRIP_FLIP` (real-arm directions), `ARM_TTS=say|voicestudio|voicebox|off`, `ARM_VOICE`.
 
 ## Known limits (see CHANGELOG for numbers)
-Nothing has run on real hardware. Thin flat objects (a pencil lying down) are not graspable in sim. Picking from a crowded box can knock neighbours out. The VP8 decoder is tested on encoded video, not a live Station.
+On the real arm (22 Nov): voice picking, sorting into bins and the feeding demo. Hand-over and feed by object id are tested with a stubbed arm only. In sim: thin flat objects (a pencil lying down) are not graspable in sim. Picking from a crowded box can knock neighbours out. The VP8 decoder is tested on encoded video, not a live Station.
