@@ -109,8 +109,11 @@ class Picker:
         self.none = (0, range(0))  # no joint-jump guard: fast mode
         self.times = []
 
-    def bin(self):
-        return self.ctl.bin if self.ctl else self.bin_name  # "bin 3" said before the drop still counts
+    def bin(self, planned=None):
+        """A bin said during the run ("bin 3") wins over the plan; else the planned bin, else the run's bin."""
+        if self.ctl and self.ctl.bin != self.bin_name:
+            return self.ctl.bin
+        return planned or self.bin_name
 
     def rpy(self, angle):
         return self.d["grip"]["roll"], self.d["grip"]["pitch"], real.jaw_yaw(angle, self.f)
@@ -140,7 +143,7 @@ class Picker:
                     if self.ctl is None:
                         raise
 
-    def pick(self, x_cm, y_cm, angle):
+    def pick(self, x_cm, y_cm, angle, bin_name=None):
         """Returns the bin used. On voice abort a held object is put back where it was, then Aborted is raised."""
         self.times = []
         x, y, g, none = x_cm / 100, y_cm / 100, self.g, self.none
@@ -155,7 +158,7 @@ class Picker:
             self.step("close", real.grip, g["close"], settle=False, at=at)  # no relief step: close and go
             held = True
             self.step("up", real.free_move, x, y, self.hover, rpy, "up", None, *none, loaded=True)
-            bin_now = self.bin()
+            bin_now = self.bin(bin_name)  # read after the lift: "bin 3" said until here still counts
             drop = real.bin_pose(bin_now)["drop"]
             self.step("bin", real.move, drop, f"{bin_now} drop", loaded=True)
             self.step("open", real.grip, g["open"], at=drop)
@@ -171,8 +174,12 @@ class Picker:
             raise
 
 
-def live(p, go):
-    """Pick from live_vision's world.json until the table is empty (see the module doc)."""
+PLAN_NEAR_CM = 4.0  # a planned object whose track id changed (hidden under the arm) is found again by label and place
+
+
+def live(p, go, plan=None):
+    """Pick from live_vision's world.json until the table is empty (see the module doc). plan (planner.py): pick only
+    these objects, each into its own bin; an object counts as planned by track id, or by the same label near the planned spot."""
     import live_vision
     if go:
         real.home()
@@ -181,6 +188,17 @@ def live(p, go):
 
     def tried(o, spots=None):
         return sum(math.hypot(o["x_cm"] - x, o["y_cm"] - y) < SAME_SPOT_CM for x, y in (tries if spots is None else spots))
+
+    def planned(o):
+        if plan is None:
+            return {"bin": None}
+        return next((e for e in plan if e["id"] == o["id"]), None) or next(
+            (e for e in plan if e.get("label") and e["label"] == o.get("label")
+             and math.hypot(o["x_cm"] - e["x_cm"], o["y_cm"] - e["y_cm"]) < PLAN_NEAR_CM), None)
+
+    def to_bin_cm(o, bin_name):
+        drop = real.bin_pose(bin_name)["drop"]
+        return math.hypot(o["x_cm"] - drop["x"] * 100, o["y_cm"] - drop["y"] * 100)
 
     def world():
         w = live_vision.world()
@@ -191,12 +209,11 @@ def live(p, go):
     try:
         while picks < MAX_PICKS and replans < MAX_REPLANS:
             voice_ctl.check(p.ctl)
-            drop = real.bin_pose(p.bin())["drop"]
-            todo = sorted((o for o in world() if tried(o) < (1 if real.DRY else TRIES_PER_SPOT) and not tried(o, skipped)),
-                          key=lambda o: math.hypot(o["x_cm"] - drop["x"] * 100, o["y_cm"] - drop["y"] * 100))
+            todo = [o for o in world() if tried(o) < (1 if real.DRY else TRIES_PER_SPOT) and not tried(o, skipped) and planned(o)]
+            todo.sort(key=lambda o: to_bin_cm(o, p.bin(planned(o)["bin"])))  # nearest to its bin first
             if found is None:
-                found = len(todo)
-                if p.ctl:
+                found = len(plan) if plan is not None else len(todo)
+                if p.ctl and plan is None:
                     voice_ctl.say(f"I see {found} to pick, into bin {p.bin()[3:]}." if found else "I see nothing I can pick.")
             if not todo:
                 if at_home:
@@ -214,6 +231,7 @@ def live(p, go):
                 skipped.append((o["x_cm"], o["y_cm"]))  # not a miss: never tried
                 continue
             now = next((n for n in world() if n["id"] == o["id"]), None)  # re-check right before moving over it
+            target = planned(o) or {"bin": None}
             if now is None or math.hypot(now["x_cm"] - o["x_cm"], now["y_cm"] - o["y_cm"]) > SAME_SPOT_CM:
                 replans += 1
                 print(f"  #{o['id']} {'gone' if now is None else 'moved'}: choosing again")
@@ -224,9 +242,9 @@ def live(p, go):
                 print(f"  #{now['id']} still there after a pick: retrying once")
             tries.append((now["x_cm"], now["y_cm"]))
             t = time.monotonic()
-            bin_used = p.pick(now["x_cm"], now["y_cm"], now["jaw_deg"])
+            bin_used = p.pick(now["x_cm"], now["y_cm"], now["jaw_deg"], target["bin"])
             picks, at_home = picks + 1, False
-            print(f"{picks}. #{now['id']} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {now['jaw_deg']:.0f} -> {bin_used}  "
+            print(f"{picks}. #{now['id']} {now.get('label') or ''} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {now['jaw_deg']:.0f} -> {bin_used}  "
                   f"{time.monotonic() - t:.1f} s   [{', '.join(p.times)}]", flush=True)
             if p.ctl and p.ctl.cancel:
                 break
@@ -235,14 +253,14 @@ def live(p, go):
     real.home()
     if go and picks:  # objects still lying at a tried spot were missed
         time.sleep(LIVE_WAIT_S)
-        misses += sum(tried(o) >= 1 for o in (live_vision.world() or []) if o["pickable"])
+        misses += sum(tried(o) >= 1 for o in (live_vision.world() or []) if o["pickable"] and planned(o))
     done = picks - misses
     print(f"done: {done} of {found or 0} ({picks} picks, {misses} missed) in {time.monotonic() - t0:.1f} s")
     return {"done": done, "found": found or 0, "seconds": round(time.monotonic() - t0, 1), "bin": p.bin()}
 
 
-def main(argv, ctl=None):
-    """ctl: a voice_ctl.Control (voice_batch.py passes one); None = no voice control."""
+def main(argv, ctl=None, plan=None):
+    """ctl: a voice_ctl.Control (voice_batch.py passes one); None = no voice control. plan: planner.py picks (live mode only)."""
     go, vision = "--go" in argv, "--vision" in argv
     args = [a for a in argv if a not in ("--go", "--vision")]
     if len(args) < (1 if vision else 2):
@@ -255,7 +273,7 @@ def main(argv, ctl=None):
         import live_vision
         if live_vision.world() is not None:
             print(f"live vision: picking into {bin_name}{'' if go else ' (dry run)'}")
-            return live(p, go)
+            return live(p, go, plan)
         print("live vision not running: one frame with Ash's detector")
         if go:
             real.home()  # out of the photo

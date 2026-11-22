@@ -9,6 +9,8 @@ Detection (no outlines, so a gap in an edge cannot lose an object):
   - paper mode (default): object = coloured, clearly darker than the paper around it, or textured (print); glare ignored
   Thin drawn lines and tape crosses are removed by an opening filter; anything touching the paper border (mug, box,
   the arm reaching in) is dropped. Pixels -> robot cm with robot_homography.json plus parallax.correct.
+Labels (LABELS=off disables): objects that stay put LABEL_AFTER_S get a short label and category from Claude (one marked
+image per batch, in a background thread, claude_cli.MODEL_LABEL), kept per track id; the 5 Hz loop never waits for it.
 Tracking: a detection within MATCH_CM of a track updates it (averaged); a track is "confirmed" after CONFIRM sightings
 and dropped after DROP_S without one. Ids stay stable while an object stays put or moves a little.
 """
@@ -26,6 +28,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import batch_pick  # noqa: E402  (camera id, paper polygon, size and reach filters)
+import claude_cli  # noqa: E402
 import parallax  # noqa: E402
 import real  # noqa: E402
 
@@ -45,6 +48,10 @@ PAPER_DELTA = 25  # paper mode: this much darker than the local paper counts
 GLARE_V = 225  # paper mode: brighter than this and colourless = reflection, ignored
 FRESH_S = 0.5  # world.json lists only objects seen this recently (no ghosts of moved objects); 2 frames at 5 Hz
 TEXTURE_MIN = 14  # paper mode: printed wrappers are busy, paper is smooth (blurred |Laplacian|)
+LABEL_AFTER_S = 1.5  # an object must stay this long before it is labelled (not a hand passing by)
+LABEL_TRIES = 2
+LABEL_FRAME = real.RUNS / "label_frame.jpg"
+CATEGORIES = ("candy", "battery", "pen", "tool", "food", "packaging", "toy", "other")
 BG_DELTA = 35  # background mode: colour difference that counts
 
 
@@ -150,22 +157,71 @@ class Tracker:
         return [t for t in self.tracks if t["hits"] >= CONFIRM]
 
 
-def state(objs, now, ms):
+class Labeler:
+    """Claude labels for confirmed tracks, one call at a time in a background thread."""
+
+    def __init__(self):
+        self.labels, self.tries, self.busy = {}, {}, False
+        self.enabled = os.environ.get("LABELS", "on") != "off"
+
+    def maybe_start(self, img, poly, objs, now):
+        if not self.enabled or self.busy:
+            return
+        todo = [t for t in objs if t["id"] not in self.labels and self.tries.get(t["id"], 0) < LABEL_TRIES
+                and now - t["first"] >= LABEL_AFTER_S and now - t["seen"] <= FRESH_S]
+        if not todo:
+            return
+        x, y, w, h = cv2.boundingRect(poly)
+        vis = img.copy()
+        for t in todo:
+            cv2.drawContours(vis, [t["contour"]], -1, (0, 220, 0), 2)
+            u, v = t["contour"][:, 0, :].max(0)
+            cv2.putText(vis, str(t["id"]), (int(u) + 4, int(v) + 4), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 0), 5)
+            cv2.putText(vis, str(t["id"]), (int(u) + 4, int(v) + 4), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 255), 2)
+            self.tries[t["id"]] = self.tries.get(t["id"], 0) + 1
+        cv2.imwrite(str(LABEL_FRAME), vis[max(0, y - 20):y + h + 20, max(0, x - 20):x + w + 20])
+        self.busy = True
+        threading.Thread(target=self._ask, args=([t["id"] for t in todo],), daemon=True).start()
+
+    def _ask(self, ids):
+        prompt = (f"Read the image {LABEL_FRAME}. It shows a table seen from above; green outlines with yellow numbers mark "
+                  f"objects {', '.join(map(str, ids))}. For each number give a short label (colour + kind of object, at most "
+                  f"4 words) and one category from: {', '.join(CATEGORIES)}. Answer ONLY with JSON like "
+                  '{"3": {"label": "red wrapped candy", "category": "candy"}}.')
+        try:
+            ans = claude_cli.ask_json(prompt, claude_cli.MODEL_LABEL, tools="Read", timeout=90)
+            for k, v in ans.items():
+                if str(k).isdigit() and int(k) in ids and isinstance(v, dict):
+                    cat = v.get("category") if v.get("category") in CATEGORIES else "other"
+                    self.labels[int(k)] = {"label": str(v.get("label") or "object")[:40], "category": cat}
+            print(f"labels: {ans}", flush=True)
+        except (RuntimeError, ValueError) as e:
+            print(f"labels: {e}", flush=True)
+        finally:
+            self.busy = False
+
+    def get(self, i):
+        return self.labels.get(i, {"label": None, "category": None})
+
+
+def state(objs, now, ms, labeler=None):
     return {"time": now, "frame_ms": round(ms), "mode": "background" if BACKGROUND.exists() else "paper",
             "objects": [{"id": t["id"], "x_cm": round(t["x_cm"], 1), "y_cm": round(t["y_cm"], 1), "jaw_deg": round(t["jaw_deg"], 1),
                          "width_cm": round(t["width_cm"], 1), "length_cm": round(t["length_cm"], 1), "pickable": t["pickable"],
-                         "why": t["why"], "age_s": round(now - t["first"], 1), "seen_s_ago": round(now - t["seen"], 2)}
+                         "why": t["why"], **(labeler.get(t["id"]) if labeler else {"label": None, "category": None}),
+                         "age_s": round(now - t["first"], 1), "seen_s_ago": round(now - t["seen"], 2)}
                         for t in sorted(objs, key=lambda t: t["id"]) if now - t["seen"] <= FRESH_S]}
 
 
-def draw(img, poly, objs):
+def draw(img, poly, objs, labeler=None):
     vis = img.copy()
     cv2.polylines(vis, [poly], True, (0, 200, 0), 1)
     for t in objs:
         col = (0, 200, 0) if t["pickable"] else (0, 0, 255)
         cv2.drawContours(vis, [t["contour"]], -1, col, 2)
         u, v = t["contour"][:, 0, :].mean(0).astype(int)
-        label = f"{t['id']}: {t['x_cm']:.1f},{t['y_cm']:.1f}" + ("" if t["pickable"] else f" {t['why']}")
+        name = labeler.get(t["id"])["label"] if labeler else None
+        label = f"{t['id']}: {name or ''} {t['x_cm']:.1f},{t['y_cm']:.1f}" + ("" if t["pickable"] else f" {t['why']}")
         cv2.putText(vis, label, (int(u) + 12, int(v) - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0) if t["pickable"] else col, 2)
     return vis
 
@@ -193,8 +249,8 @@ table{border-collapse:collapse;margin-top:8px}td,th{padding:3px 10px;border-bott
 async function tick(){const s=await (await fetch('/world')).json();
 document.getElementById('h').textContent=`${s.objects.length} objects (${s.objects.filter(o=>o.pickable).length} pickable) · ${s.mode} mode · ${s.frame_ms} ms/frame`;
 document.getElementById('i').src='/world.jpg?'+Date.now();
-document.getElementById('t').innerHTML='<tr><th>id</th><th>x cm</th><th>y cm</th><th>jaw °</th><th>w×l cm</th><th>age s</th><th></th></tr>'+
- s.objects.map(o=>`<tr><td>${o.id}</td><td>${o.x_cm}</td><td>${o.y_cm}</td><td>${o.jaw_deg}</td><td>${o.width_cm}×${o.length_cm}</td><td>${o.age_s}</td><td>${o.pickable?'':o.why}</td></tr>`).join('')}
+document.getElementById('t').innerHTML='<tr><th>id</th><th>x cm</th><th>y cm</th><th>jaw °</th><th>w×l cm</th><th>label</th><th>age s</th><th></th></tr>'+
+ s.objects.map(o=>`<tr><td>${o.id}</td><td>${o.x_cm}</td><td>${o.y_cm}</td><td>${o.jaw_deg}</td><td>${o.width_cm}×${o.length_cm}</td><td style="text-align:left">${o.label||''}${o.category?' ('+o.category+')':''}</td><td>${o.age_s}</td><td>${o.pickable?'':o.why}</td></tr>`).join('')}
 tick();setInterval(tick,400);
 </script>"""
 
@@ -227,7 +283,7 @@ def run():
     real.RUNS.mkdir(parents=True, exist_ok=True)
     threading.Thread(target=ThreadingHTTPServer(("127.0.0.1", PORT), Page).serve_forever, daemon=True).start()
     print(f"live vision: http://127.0.0.1:{PORT}  ({'background' if BACKGROUND.exists() else 'paper'} mode), Ctrl-C to stop", flush=True)
-    tr, last_img = Tracker(), 0.0
+    tr, last_img, lab = Tracker(), 0.0, Labeler()
     while True:
         t0 = time.monotonic()
         try:
@@ -235,9 +291,10 @@ def run():
             if list(img.shape[1::-1]) != size:
                 raise RuntimeError(f"frame {img.shape[1]}x{img.shape[0]} differs from the mapping {size}")
             objs = tr.update(detect(img, H, paper, poly), time.time())
-            write_json(WORLD, state(objs, time.time(), (time.monotonic() - t0) * 1000))
+            write_json(WORLD, state(objs, time.time(), (time.monotonic() - t0) * 1000, lab))
+            lab.maybe_start(img, poly, objs, time.time())
             if time.monotonic() - last_img > 0.4:
-                cv2.imwrite(str(OVERLAY.with_suffix(".tmp.jpg")), draw(img, poly, objs))
+                cv2.imwrite(str(OVERLAY.with_suffix(".tmp.jpg")), draw(img, poly, objs, lab))
                 OVERLAY.with_suffix(".tmp.jpg").replace(OVERLAY)
                 last_img = time.monotonic()
         except (OSError, RuntimeError, ValueError, cv2.error) as e:  # log and keep going; world.json goes stale
