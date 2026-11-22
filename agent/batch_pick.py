@@ -48,7 +48,8 @@ LIVE_WAIT_S = 1.2  # after home: arm out of the view, the tracker needs 3 frames
 SAME_SPOT_CM = 2.0  # an object this close to an earlier attempt is the same one (a miss)
 TRIES_PER_SPOT = 2
 MAX_PICKS = 20
-MAX_REPLANS = 10  # target gone or moved between choosing and moving, in a row: give up
+MAX_REPLANS = 10
+JAW_TRIES_DEG = (0, 10, -10, 20, -20)  # the IK solver gets stuck in narrow wrist-angle bands; the jaws tolerate 20 deg  # target gone or moved between choosing and moving, in a row: give up
 
 
 def vision_targets(drop):
@@ -132,16 +133,28 @@ class Picker:
         return out
 
     def solvable(self, x_cm, y_cm, angle):
-        """IK for hover and grip height, no motion. Raises real.Refused if out of reach."""
-        for z in (self.hover, self.zg):
-            while True:
-                voice_ctl.check(self.ctl)
-                try:
-                    real.free_move(x_cm / 100, y_cm / 100, z, self.rpy(angle), "check", None, *self.none, execute=False)
-                    break
-                except real.Stopped:  # paused by voice during the check: wait, then solve again
-                    if self.ctl is None:
-                        raise
+        """IK for hover and grip height, no motion. Returns the jaw angle to use: the object's own, or the nearest of
+        JAW_TRIES_DEG the solver accepts. Raises real.Refused only if every one is refused."""
+        refused = None
+        for off in JAW_TRIES_DEG:
+            a = (angle + off) % 180
+            try:
+                for z in (self.hover, self.zg):
+                    while True:
+                        voice_ctl.check(self.ctl)
+                        try:
+                            real.free_move(x_cm / 100, y_cm / 100, z, self.rpy(a), "check", None, *self.none, execute=False)
+                            break
+                        except real.Stopped:  # paused by voice during the check: wait, then solve again
+                            if self.ctl is None:
+                                raise
+            except real.Refused as e:
+                refused = refused or e
+                continue
+            if off:
+                print(f"  jaw {angle:.0f} deg refused by IK, using {a:.0f} deg", flush=True)
+            return a
+        raise refused
 
     def pick(self, x_cm, y_cm, angle, bin_name=None):
         """Returns the bin used. On voice abort a held object is put back where it was, then Aborted is raised."""
@@ -227,7 +240,7 @@ def live(p, go, plan=None, notify=None):
                 continue
             o = todo[0]
             try:
-                p.solvable(o["x_cm"], o["y_cm"], o["jaw_deg"])
+                angle = p.solvable(o["x_cm"], o["y_cm"], o["jaw_deg"])
             except real.Refused as e:
                 print(f"  skip #{o['id']} ({o['x_cm']:.1f}, {o['y_cm']:.1f}) cm: {e}")
                 skipped.append((o["x_cm"], o["y_cm"]))  # not a miss: never tried
@@ -246,9 +259,10 @@ def live(p, go, plan=None, notify=None):
                 notify("retry", f"Missed the {now.get('label') or 'object'}, trying once more.")
             tries.append((now["x_cm"], now["y_cm"]))
             t = time.monotonic()
-            bin_used = p.pick(now["x_cm"], now["y_cm"], now["jaw_deg"], target["bin"])
+            angle = (angle + now["jaw_deg"] - o["jaw_deg"]) % 180  # keep the IK offset if the angle estimate moved
+            bin_used = p.pick(now["x_cm"], now["y_cm"], angle, target["bin"])
             picks, at_home = picks + 1, False
-            print(f"{picks}. #{now['id']} {now.get('label') or ''} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {now['jaw_deg']:.0f} -> {bin_used}  "
+            print(f"{picks}. #{now['id']} {now.get('label') or ''} ({now['x_cm']:.1f}, {now['y_cm']:.1f}) cm jaw {angle:.0f} -> {bin_used}  "
                   f"{time.monotonic() - t:.1f} s   [{', '.join(p.times)}]", flush=True)
             notify("picked", f"Put the {now.get('label') or 'object'} in bin {bin_used[3:]}.")
             if p.ctl and p.ctl.cancel:
@@ -287,8 +301,7 @@ def main(argv, ctl=None, plan=None, notify=None):
         ok = []  # solve every target first (no motion); an unreachable one is skipped instead of stopping the batch
         for x_cm, y_cm, angle in targets:
             try:
-                p.solvable(x_cm, y_cm, angle)
-                ok.append((x_cm, y_cm, angle))
+                ok.append((x_cm, y_cm, p.solvable(x_cm, y_cm, angle)))
             except real.Refused as e:
                 print(f"  skip ({x_cm:.1f}, {y_cm:.1f}) cm: {e}")
             except voice_ctl.Aborted:
