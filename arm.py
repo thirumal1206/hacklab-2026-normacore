@@ -1378,17 +1378,17 @@ VIEW_HTML = """<!doctype html><meta charset=utf-8><title>Arm live view</title>
 const send=t=>t&&fetch('command',{method:'POST',body:JSON.stringify({text:t})});
 const f=document.getElementById('f'),t=document.getElementById('t'),mic=document.getElementById('mic');
 f.onsubmit=e=>{e.preventDefault();send(t.value.trim());t.value=''};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\\bfriday\\b[\\s,.!?]*/i;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\\balfred\\b[\\s,.!?]*/i;
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,'').trim();
 let said='',hands=null;
 setInterval(async()=>{try{said=norm((await (await fetch('state')).json()).said)}catch(_){}},500);
-const echo=t=>{const w=norm(t).split(' ').filter(x=>x.length>2&&x!=='friday'),s=new Set(said.split(' '));
+const echo=t=>{const w=norm(t).split(' ').filter(x=>x.length>2&&x!=='alfred'),s=new Set(said.split(' '));
   return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
 if(!SR)mic.disabled=true,mic.title='no speech recognition in this browser: type instead';
 else mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove('on');mic.textContent='Hands-free';return}
   const r=new SR();r.lang='en-US';r.continuous=true;r.interimResults=true;hands=r;
-  mic.classList.add('on');mic.textContent='Listening: say "Friday, ..."';
+  mic.classList.add('on');mic.textContent='Listening: say "Alfred, ..."';
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
     if(!WAKE.test(t)||echo(t))continue;
     if(!e.results[i].isFinal){fetch('hush',{method:'POST'});continue}  // barge-in on the wake word

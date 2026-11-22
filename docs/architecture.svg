@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 720" width="1400" height="720" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#eef2f7"/></linearGradient>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity=".10"/></filter>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#475569"/></marker>
+    <marker id="arR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+    <!-- icons: 48x48, stroke style -->
+    <symbol id="i-user" viewBox="0 0 48 48"><circle cx="24" cy="15" r="8" fill="none" stroke="currentColor" stroke-width="3"/><path d="M8 42c2-9 8-14 16-14s14 5 16 14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 48 48"><rect x="17" y="5" width="14" height="24" rx="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M10 23a14 14 0 0 0 28 0M24 37v6M17 43h14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-brain" viewBox="0 0 48 48"><path d="M24 8v32M24 10a7 7 0 0 0-13 3 7 7 0 0 0-3 12 7 7 0 0 0 5 11 7 7 0 0 0 11 3M24 10a7 7 0 0 1 13 3 7 7 0 0 1 3 12 7 7 0 0 1-5 11 7 7 0 0 1-11 3" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 48 48"><path d="M17 6v10M31 6v10M11 16h26v8a13 13 0 0 1-26 0zM24 37v7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pack" viewBox="0 0 48 48"><path d="M24 5l17 9v20l-17 9-17-9V14zM7 14l17 9 17-9M24 23v20" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></symbol>
+    <symbol id="i-server" viewBox="0 0 48 48"><rect x="7" y="7" width="34" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><rect x="7" y="27" width="34" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="14" cy="14" r="2" fill="currentColor"/><circle cx="14" cy="34" r="2" fill="currentColor"/><path d="M22 14h12M22 34h12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 48 48"><path d="M24 4l16 6v12c0 10-7 18-16 22C15 40 8 32 8 22V10z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M17 24l5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 48 48"><path d="M6 15h9l4-6h10l4 6h9v24H6z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="24" cy="26" r="8" fill="none" stroke="currentColor" stroke-width="3"/></symbol>
+    <symbol id="i-arm" viewBox="0 0 48 48"><path d="M8 44h20M18 44V36" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="32" r="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 29l10-15" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="31" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M34 13l7 6M41 19l-2 6M41 19l4 3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 48 48"><circle cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v7M24 37v7M4 24h7M37 24h7M10 10l5 5M33 33l5 5M10 38l5-5M33 15l5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 48 48"><path d="M16 4h16l12 12v16L32 44H16L4 32V16z" fill="currentColor"/><path d="M15 24h18" stroke="#fff" stroke-width="4" stroke-linecap="round"/></symbol>
+  </defs>
+  <rect width="1400" height="720" fill="#f8fafc"/>
+  <text x="48" y="58" font-size="30" font-weight="800" fill="#0f172a">Alfred architecture</text>
+  <text x="48" y="88" font-size="16" fill="#475569">Two front doors, one arm server. The agent picks objects and bins; the arm server moves and keeps the arm safe.</text>
+
+  <g font-size="13" font-weight="700" letter-spacing="1.5" fill="#64748b">
+    <text x="62" y="140">YOU</text><text x="352" y="140">AGENT</text><text x="722" y="140">ARM SERVER (127.0.0.1)</text><text x="1112" y="140">HARDWARE</text>
+  </g>
+
+  <!-- Person -->
+  <g filter="url(#sh)"><rect x="48" y="300" width="220" height="100" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="64" y="322" width="56" height="56" rx="12" fill="#e0f2fe"/><use href="#i-user" x="70" y="328" width="44" height="44" color="#0369a1"/>
+  <text x="134" y="345" font-size="18" font-weight="700" fill="#0f172a">Person</text>
+  <text x="134" y="368" font-size="13" fill="#475569">speaks or types</text>
+
+  <!-- Voice agent -->
+  <g filter="url(#sh)"><rect x="338" y="170" width="290" height="130" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="354" y="190" width="56" height="56" rx="12" fill="#ede9fe"/><use href="#i-mic" x="360" y="196" width="44" height="44" color="#6d28d9"/>
+  <text x="424" y="212" font-size="18" font-weight="700" fill="#0f172a">Voice agent</text>
+  <text x="424" y="234" font-size="13" fill="#475569">ElevenLabs + Claude Haiku</text>
+  <text x="354" y="276" font-size="12" fill="#6d28d9" font-family="ui-monospace,Menlo,monospace">voice_page.html (served on :8772)</text>
+
+  <!-- Claude Code + pack -->
+  <g filter="url(#sh)"><rect x="338" y="400" width="290" height="190" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="354" y="420" width="56" height="56" rx="12" fill="#dcfce7"/><use href="#i-pack" x="360" y="426" width="44" height="44" color="#15803d"/>
+  <text x="424" y="442" font-size="18" font-weight="700" fill="#0f172a">Claude Code</text>
+  <text x="424" y="464" font-size="13" fill="#475569">+ arm_mcp.py (MCP pack)</text>
+  <g font-size="13" fill="#166534">
+    <rect x="354" y="494" width="258" height="36" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/><text x="368" y="517"><tspan font-weight="700">table</tspan>  pick · set_bin · handover · 100%</text>
+    <rect x="354" y="538" width="258" height="36" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/><text x="368" y="561"><tspan font-weight="700">assist</tspan>  feed · handover · 30%</text>
+  </g>
+
+  <!-- arm_server -->
+  <g filter="url(#sh)"><rect x="708" y="230" width="320" height="250" rx="14" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/></g>
+  <rect x="724" y="250" width="56" height="56" rx="12" fill="#e2e8f0"/><use href="#i-server" x="730" y="256" width="44" height="44" color="#334155"/>
+  <text x="794" y="272" font-size="18" font-weight="700" fill="#0f172a">arm_server.py</text>
+  <text x="794" y="294" font-size="13" fill="#475569">owns the arm · HTTP :8772</text>
+  <text x="724" y="336" font-size="13" fill="#334155">pick · handover · feed · stop · speed</text>
+  <rect x="724" y="354" width="288" height="106" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+  <use href="#i-shield" x="736" y="368" width="36" height="36" color="#c2410c"/>
+  <text x="782" y="386" font-size="14" font-weight="700" fill="#9a3412">Safety lives here</text>
+  <text x="782" y="408" font-size="12" fill="#9a3412">workspace and IK limits</text>
+  <text x="782" y="426" font-size="12" fill="#9a3412">speed cap, slow near the person</text>
+  <text x="782" y="444" font-size="12" fill="#9a3412">stop · abort puts the object back</text>
+
+  <!-- live vision -->
+  <g filter="url(#sh)"><rect x="708" y="540" width="320" height="100" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="724" y="562" width="56" height="56" rx="12" fill="#cffafe"/><use href="#i-cam" x="730" y="568" width="44" height="44" color="#0e7490"/>
+  <text x="794" y="585" font-size="18" font-weight="700" fill="#0f172a">live_vision.py</text>
+  <text x="794" y="608" font-size="13" fill="#475569">OpenCV · objects + table x,y</text>
+
+  <!-- Station -->
+  <g filter="url(#sh)"><rect x="1098" y="230" width="250" height="100" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="1114" y="252" width="56" height="56" rx="12" fill="#e0e7ff"/><use href="#i-cog" x="1120" y="258" width="44" height="44" color="#4338ca"/>
+  <text x="1184" y="275" font-size="18" font-weight="700" fill="#0f172a">Station + IK</text>
+  <text x="1184" y="298" font-size="13" fill="#475569">NormaCore API</text>
+
+  <!-- Arm -->
+  <g filter="url(#sh)"><rect x="1098" y="380" width="250" height="100" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="1114" y="402" width="56" height="56" rx="12" fill="#fce7f3"/><use href="#i-arm" x="1120" y="408" width="44" height="44" color="#be185d"/>
+  <text x="1184" y="425" font-size="18" font-weight="700" fill="#0f172a">ElRobot arm</text>
+  <text x="1184" y="448" font-size="13" fill="#475569">12 V plug = hard stop</text>
+
+  <!-- Camera -->
+  <g filter="url(#sh)"><rect x="1098" y="540" width="250" height="100" rx="14" fill="#fff" stroke="#cbd5e1"/></g>
+  <rect x="1114" y="562" width="56" height="56" rx="12" fill="#cffafe"/><use href="#i-cam" x="1120" y="568" width="44" height="44" color="#0e7490"/>
+  <text x="1184" y="585" font-size="18" font-weight="700" fill="#0f172a">USB camera</text>
+  <text x="1184" y="608" font-size="13" fill="#475569">top view of the table</text>
+
+  <!-- arrows: each one is a real call or data flow -->
+  <g stroke="#475569" stroke-width="2.2" fill="none" marker-end="url(#ar)">
+    <path d="M268 330 C300 330 300 235 334 235"/>
+    <path d="M268 370 C300 370 300 470 334 470"/>
+    <path d="M628 235 C670 235 670 290 704 290"/>
+    <path d="M628 470 C670 470 670 420 704 420"/>
+    <path d="M1028 280 H1094"/>
+    <path d="M1223 330 V376"/>
+    <path d="M1098 590 H1032"/>
+    <path d="M868 540 V484"/>
+  </g>
+  <g font-size="12" font-weight="600" fill="#334155">
+    <text x="276" y="268">voice</text>
+    <text x="276" y="440">text</text>
+    <text x="640" y="222">HTTP</text>
+    <text x="640" y="492">HTTP</text>
+    <text x="1036" y="270">pose → joints</text>
+    <text x="1040" y="580">frames</text>
+    <text x="878" y="518">objects</text>
+  </g>
+  <text x="48" y="690" font-size="13" fill="#64748b">New mode = new folder in operator/packs/ (tools, speed, instructions). No new motion code. The stop word goes from the voice page straight to /api/stop, without the model.</text>
+</svg>

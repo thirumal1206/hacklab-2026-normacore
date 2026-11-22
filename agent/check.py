@@ -81,8 +81,13 @@ r = d.sort("p1", "Painkillers", "plan", read_name="Ibuprofen")
 check("dry run: planned, not moved", r.get("dry_run") and not r.get("placed") and "p1" in d.scan()["packs"].__repr__())
 os.environ.pop("AGENT_DRY_RUN")
 
-missing = sorter.missing_config()
-check(f"empty templates: real backend refused ({len(missing)} values missing)", "pose: home" in missing)
+import real  # noqa: E402
+
+missing = sorter.missing_config()  # the real config may be taught by now; test the rule on an untaught copy
+blank = json.loads((sorter.CONFIG / "motion.json").read_text())
+blank["poses"]["home"] = None
+check(f"untaught home pose: real backend refused ({len(missing)} values missing in the live config)",
+      "home" in real.missing_poses(blank))
 check("proof log records the config fingerprint", '"config_sha256"' in (RUNS / "proof.jsonl").read_text())
 
 msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
@@ -92,7 +97,7 @@ msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
 out = subprocess.run([sys.executable, str(Path(__file__).parent / "mcp_server.py")], input="\n".join(map(json.dumps, msgs)) + "\n",
                      capture_output=True, text=True, timeout=60).stdout.splitlines()
 replies = [json.loads(x) for x in out]
-check("mcp: vision preview tool listed", "vision_preview" in {t["name"] for t in replies[1]["result"]["tools"]})
+check("mcp: 8 tools listed", len(replies[1]["result"]["tools"]) == 8)
 check("mcp: scan returns packs", len(json.loads(replies[2]["result"]["content"][0]["text"])["packs"]) == 7)
 check("mcp: inspect returns an image", replies[3]["result"]["content"][1]["type"] == "image")
 
@@ -104,7 +109,7 @@ dashboard.heard("sort the table please")
 check("voice: listen returns what was said", v.listen(1)["instruction"] == "sort the table please")
 check("voice: nothing said -> null", v.listen(0.5)["instruction"] is None)
 check("voice: say is logged for the dashboard", v.say("Done.")["said"] == "Done." and '"event": "say"' in (RUNS / "proof.jsonl").read_text())
-dashboard.heard("Friday stop now")
+dashboard.heard("Alfred stop now")
 try:
     check("voice: a stop word freezes the tools at once", sorter.STOP.exists() and "stopped" in v.scan().get("error", ""))
     check("voice: listen reports the stop", v.listen(1)["stopped"])

@@ -1,0 +1,2 @@
+- Batch pick `--vision`: positions and jaw angles from one top-camera frame (Ash's outline detector on the paper sheet, robot homography refit on 7 robot-touched crosses for the current camera), IK pre-check skips unreachable objects, marked frame saved to runs/agent/vision_batch.jpg. No Claude in the loop.
+- Vision offset +1.4 cm x, +0.1 cm y (`VISION_OFFSET_CM` in batch_pick.py): candy tops sit ~2 cm above the table-fitted mapping and the top camera sees them from the +x side; measured with the wrist camera on 3 candies (x -1.3 to -1.5 cm).

@@ -1,0 +1,42 @@
+{
+  "camera_id": "835446b047547e89f1f2e588eedf268b",
+  "H_pixel_to_xy": [
+    [
+      -3.389670095781332e-05,
+      0.0029801888270067187,
+      -1.0302051394836091
+    ],
+    [
+      0.0019302974489777724,
+      9.332793730746704e-05,
+      -1.3174552262233483
+    ],
+    [
+      0.00010040217602150886,
+      0.002625979803353353,
+      1.0
+    ]
+  ],
+  "image_size": [
+    1280,
+    960
+  ],
+  "points": 9,
+  "rms_mm": 2.9,
+  "max_mm": 9.9,
+  "loo_rms_mm": 5.7,
+  "model": "homography",
+  "time": "2026-11-22 refit",
+  "crosses_used": [
+    "cross_1",
+    "cross_2",
+    "cross_3",
+    "cross_4",
+    "cross_5",
+    "cross_6",
+    "cross_7",
+    "cross_8",
+    "cross_9"
+  ],
+  "z_note": "22.11 morning touches (hand-guided) + cross pixels re-found after the camera shifted about 8 px; pixel -> follower FK x, y (m)"
+}

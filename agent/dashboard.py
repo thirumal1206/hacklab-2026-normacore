@@ -12,7 +12,8 @@ from pathlib import Path
 RUNS = Path(__file__).resolve().parent.parent / "runs" / "agent"
 PORT = int(os.environ.get("DASH_PORT", "8770"))
 SAID = RUNS.parent / "said.jsonl"  # written by arm.Voice
-STOP_WORDS = re.compile(r"\b(stop|wait|cancel|freeze|halt)\b", re.I)
+STOP_WORDS = re.compile(r"\b(stop|wait|pause|freeze|halt|hold on)\b", re.I)  # "cancel" ends a batch gracefully instead
+RESUME_WORDS = re.compile(r"\b(continue|resume|go on|carry on|keep going)\b", re.I)
 
 
 def heard(text):
@@ -23,6 +24,8 @@ def heard(text):
     (RUNS / "hush").touch()
     if STOP_WORDS.search(text):
         (RUNS / "STOP").touch()
+    elif RESUME_WORDS.search(text):  # a person in the room releases their own stop
+        (RUNS / "STOP").unlink(missing_ok=True)
     with (RUNS / "inbox.jsonl").open("a") as fh:
         fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "text": text}) + "\n")
 
@@ -38,23 +41,13 @@ def state():
     start = max((i for i, r in enumerate(rows) if r.get("session") == "start"), default=0)
     rows = rows[start:]  # current session only
     scan = json.loads((RUNS / "scan.json").read_text()) if (RUNS / "scan.json").exists() else {"packs": [], "bins": []}
-    said = []  # Friday's lines from the last 20 s: the page drops mic transcripts that echo them
+    said = []  # Alfred's lines from the last 20 s: the page drops mic transcripts that echo them
     if SAID.exists():
         for line in SAID.read_text().splitlines()[-20:]:
             r = json.loads(line)
             if time.time() - r["t"] < 20:
                 said.append(r["text"])
-    motion = []
-    if (RUNS / "motion.jsonl").exists() and rows:
-        since = rows[0].get("time", "")
-        for line in (RUNS / "motion.jsonl").read_text().splitlines()[-500:]:
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            if r.get("time", "") >= since:
-                motion.append(r)
-    return {"session": rows[0] if rows else None, "events": rows[1:], "scan": scan, "motion": motion, "stopped": (RUNS / "STOP").exists(),
+    return {"session": rows[0] if rows else None, "events": rows[1:], "scan": scan, "stopped": (RUNS / "STOP").exists(),
             "said": " ".join(said), "speaking": (SAID.parent / "speaking").exists()}
 
 
@@ -131,16 +124,14 @@ td{padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}.why{colo
 .ev .t{color:var(--dim);font-size:11px}.ev.veto{background:#2a1416}
 .ev img{max-width:100%;border-radius:6px;margin-top:6px;display:block}
 .empty{color:var(--dim);padding:20px 0}
-.wide{grid-column:1/-1}.mt{max-height:40vh;overflow:auto}.mt td{font-size:13px;padding:5px 6px}.warn{color:var(--recall)}
 .banner{grid-column:1/-1;background:#3d1214;border:1px solid var(--expired);color:#ffb4ae;padding:10px 14px;border-radius:8px;font-weight:600}
 </style></head><body>
 <header><div class="live" id="live"></div><div><h1>Pack Sorter</h1><div class="sub" id="sub">waiting for a session</div></div>
-<form id="talk"><button type="button" id="mic">🎙 Hands-free</button><input id="txt" placeholder="Type to Friday, Enter to send" autocomplete="off"></form>
+<form id="talk"><button type="button" id="mic">🎙 Hands-free</button><input id="txt" placeholder="Type to Alfred, Enter to send" autocomplete="off"></form>
 <button id="stop">STOP</button></header>
 <main><div class="tiles" id="tiles"></div><div id="banner" hidden class="banner"></div>
 <section><h2>Packs: what Claude read and decided</h2><div id="packs"></div></section>
-<section><h2>Live log</h2><div class="feed" id="feed"></div></section>
-<section class="wide"><h2>Arm steps: asked vs reached</h2><div id="motion" class="mt"></div></section></main>
+<section><h2>Live log</h2><div class="feed" id="feed"></div></section></main>
 <script>
 const C={"Stock":"var(--stock)","Expired":"var(--expired)","Recall":"var(--recall)","Manual check":"var(--manual)","Unknown":"var(--manual)",
   "Painkillers":"var(--stock)","Allergy":"var(--accent)","Vitamins":"var(--recall)",flag:"var(--flag)"};
@@ -149,7 +140,7 @@ const chip=b=>b?`<span class="chip" style="--c:${C[b]||"var(--accent)"}">${esc(b
 let stopped=false;
 document.getElementById("stop").onclick=async()=>{await fetch(stopped?"/resume":"/stop",{method:"POST"});tick()};
 function line(r){
-  if(r.event==="say")return{c:"#fff",cls:"say",h:`🗣 <b>Friday:</b> ${esc(r.text)}`};
+  if(r.event==="say")return{c:"#fff",cls:"say",h:`🗣 <b>Alfred:</b> ${esc(r.text)}`};
   if(r.event==="heard")return{c:"var(--recall)",cls:"you",h:`You: ${esc(r.text)}`};
   if(r.event==="scan")return{c:"var(--accent)",h:`Scanned the table: <b>${r.packs}</b> packs`};
   if(r.event==="inspect")return{c:"var(--accent)",h:`Read the label of <b>${esc(r.id)}</b>`+(r.image?`<img src="/img/${encodeURIComponent(r.image.split("/").pop())}">`:"")};
@@ -181,40 +172,28 @@ async function tick(){
     return `<tr><td><b>${esc(p.id)}</b><div class="why">x ${p.x_cm} · y ${p.y_cm} cm${p.in_reach?"":" · out of reach"}</div></td>
     <td>${crops[p.id]?`<img src="/img/${encodeURIComponent(crops[p.id])}" style="width:110px;border-radius:4px">`:`<span class="pend">–</span>`}</td>
     <td><b>${esc(r&&r.read_name||"")}</b><div class="why">${r&&r.product?"catalogue: "+esc(r.product):r&&r.read_name?"not in the catalogue":""}</div></td>
-    <td>${chip(r&&(r.verified||r.dry_run)?r.bin:null)}<div class="why">${esc(r&&r.reason||"")}</div></td><td class="st">${st(r)}${motionSummary(s.motion||[],p.id)}</td></tr>`}).join("")+"</table>"
+    <td>${chip(r&&(r.verified||r.dry_run)?r.bin:null)}<div class="why">${esc(r&&r.reason||"")}</div></td><td class="st">${st(r)}</td></tr>`}).join("")+"</table>"
    :`<table><tr><th>Pack</th><th>Expiry</th><th>Bin</th><th>Status</th></tr>`+packs.map(p=>{const r=last[p.id];
     return `<tr><td><b>${esc(p.product||"unknown product")}</b><div class="why">${esc(p.id)} · ${esc(p.code||"code unreadable")}${p.recalled?" · recalled":""}${p.in_reach?"":" · out of reach"}</div></td>
     <td>${esc(p.expiry||"?")}<div class="why">${p.days_left!=null?p.days_left+" days":""}</div></td><td>${chip(r&&(r.verified||r.dry_run)?r.bin:null)}<div class="why">${esc(r&&r.reason||"")}</div></td><td class="st">${st(r)}</td></tr>`}).join("")+"</table>"):`<div class="empty">No scan yet. Start Claude: operator/sorter/run.sh</div>`;
-  document.getElementById("motion").innerHTML=motionTable(s.motion||[]);
   document.getElementById("feed").innerHTML=s.events.slice().reverse().map(r=>{const l=line(r);return l?`<div class="ev${l.veto?" veto":""}${l.cls?" "+l.cls:""}" style="--c:${l.c}"><div class="t">${esc((r.time||"").slice(11))}</div>${l.h}</div>`:""}).join("")||`<div class="empty">Nothing yet.</div>`}
 const send=t=>t&&fetch("/heard",{method:"POST",body:JSON.stringify({text:t})}).then(tick);
 document.getElementById("talk").onsubmit=e=>{e.preventDefault();const i=document.getElementById("txt");send(i.value.trim());i.value=""};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\bfriday\b[\s,.!?]*/i,mic=document.getElementById("mic");
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,WAKE=/\balfred\b[\s,.!?]*/i,mic=document.getElementById("mic");
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,"").trim();let said="",hands=null;
-const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="friday"),s=new Set(norm(said).split(" "));
+const echo=t=>{const w=norm(t).split(" ").filter(x=>x.length>2&&x!=="alfred"),s=new Set(norm(said).split(" "));
   return w.length>0&&w.filter(x=>s.has(x)).length/w.length>=0.6};  // mostly her own recent words: the mic heard the speaker
 if(!SR){mic.disabled=true;mic.title="No speech recognition in this browser: use Chrome, or type"}
 else mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove("on");mic.textContent="🎙 Hands-free";return}
   const r=new SR();r.lang="en-US";r.continuous=true;r.interimResults=true;hands=r;
-  mic.classList.add("on");mic.textContent='Listening: "Friday, ..."';
+  mic.classList.add("on");mic.textContent='Listening: "Alfred, ..."';
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
     if(!WAKE.test(t)||echo(t))continue;
     if(!e.results[i].isFinal){fetch("/hush",{method:"POST"});continue}  // barge-in on the wake word
     send(t.slice(t.search(WAKE)).replace(WAKE,"").trim()||"yes?")}};
   r.onend=()=>{if(hands===r)r.start()};  // Chrome ends sessions after silence: keep listening
   r.start()};
-function motionTable(rows){
-  if(!rows.length)return `<div class="empty">No arm steps yet (fake backend moves no arm).</div>`;
-  const f=v=>v?`${v.x}, ${v.y}, ${v.z}`:"";
-  return `<table><tr><th>Time</th><th>Pack</th><th>Sequence</th><th>Step</th><th>Asked (cm)</th><th>Reached (cm)</th><th>Off</th><th>Time</th><th>Result</th></tr>`+
-   rows.slice().reverse().slice(0,80).map(r=>{const bad=/refused|stopped|not taught|nothing/.test(r.result||"");const warn=r.off_mm>10;
-    const res=r.result||(r.kind==="grip"?`opening ${r.opening}`:r.kind==="photo"?r.photo:r.status||"");
-    return `<tr><td class="why">${esc((r.time||"").slice(11))}</td><td>${esc(r.pack||"")}</td><td>${esc(r.seq||"")}</td><td><b>${esc(r.step)}</b>${r.loaded?' <span class="why">loaded</span>':""}</td>
-     <td>${f(r.target_cm)}</td><td>${f(r.reached_cm)}</td><td class="${warn?"warn":""}">${r.off_mm!=null?r.off_mm+" mm":""}</td><td>${r.seconds!=null?r.seconds+" s":""}</td>
-     <td class="${bad?"bad":warn?"warn":"ok"}">${esc(res)}</td></tr>`}).join("")+"</table>"}
-function motionSummary(rows,id){const m=rows.filter(r=>r.pack===id&&r.kind==="move"&&r.off_mm!=null);if(!m.length)return"";
-  return `<div class="why">${m.length} moves · max off ${Math.max(...m.map(r=>r.off_mm))} mm · ${m.reduce((a,r)=>a+r.seconds,0).toFixed(1)} s</div>`}
 tick();setInterval(tick,1000);
 </script></body></html>"""
 

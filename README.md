@@ -1,10 +1,31 @@
-# HackLab 2026: NormaCore track
+# Alfred: a voice-driven assistant arm
 
-Claude Code or Codex controls a robot arm by looking through its cameras, using NormaCore's Station API.
+HackLab Robotics x BRISA, Berlin, 21-22 Nov 2026, NormaCore track. You talk to Alfred; a camera finds the objects, Claude decides what to do, and deterministic code moves the arm and keeps it safe.
 
-The model chooses and verifies; code measures and moves. A daemon (`arm.py serve`) holds the robot (or a MuJoCo simulation) and enforces every safety limit. The model calls a small CLI or the MCP tools: `locate` numbers the objects it sees, `pick`/`place` grasp them, and `locate`/`look` confirm the result. A voice assistant, Friday, sits on top.
+**Modes are MCP packs.** One arm server owns motion, vision, speed limits and the stop. Each mode is a small pack (`operator/packs/<mode>/pack.json`) listing its tools, its speed and how Alfred behaves. A new mode is a new pack, not new motion code.
 
-**New here? Open [`docs/field-guide.html`](docs/field-guide.html) in a browser first:** architecture, sequence diagrams, the pick pipeline, safety layers, results and what we tried.
+| Pack | What it does | Speed |
+|---|---|---|
+| `table` | Tidy the desk: sort objects into bins, hand one to you | full |
+| `assist` | Feeding and hand-over for people with limited arm use | 30 % |
+
+![Alfred architecture](docs/architecture.svg)
+
+**Tidy mode, step by step:**
+
+![Tidy mode sequence](docs/sequence-tidy.svg)
+
+## Run Alfred on the arm
+```bash
+.venv/bin/python agent/live_vision.py              # camera -> objects (page on :8771)
+.venv/bin/python agent/arm_server.py               # dry run: plans, nothing moves; add --go for the real arm
+claude mcp add table -e PACK=table -- $PWD/.venv/bin/python $PWD/agent/arm_mcp.py
+```
+Then in Claude: *"Alfred, tidy my desk: pens left, snacks right."* The voice page on http://127.0.0.1:8772 (ElevenLabs) works beside it. Saying "stop", the STOP button and the 12 V plug always work. Details: [`operator/packs/README.md`](operator/packs/README.md).
+
+The sections below cover setup and the MuJoCo simulation we started from.
+
+**Visual overview:** open [`docs/field-guide.html`](docs/field-guide.html) in a browser.
 
 ## 1. One-time setup (macOS)
 You need [Homebrew](https://brew.sh). Then, in a terminal:
@@ -60,10 +81,10 @@ ARM_SOCK=$PWD/runs/arm.sock .venv/bin/python arm.py serve --backend sim --seed 3
 ```
 How Codex is given permission for the socket is not verified yet; see `venue/VENUE.md`.
 
-## 4. Talk to Friday (voice assistant)
+## 4. Talk to Alfred (voice assistant)
 1. Start the daemon with a voice: `ARM_TTS=say` uses the built-in macOS voice. `ARM_TTS=voicestudio` uses the better voice if VoiceStudio runs locally on port 3900. `ARM_TTS=off` is silent.
 2. In `operator/`, start `claude --model haiku` and type: *Run in assistant mode.*
-3. In the live view, click **Hands-free** once and allow the microphone. Then speak: "Friday, put the red cube in the box." Only sentences with "Friday" reach her. "Friday, stop" freezes the arm. You can also type into the box and press Enter.
+3. In the live view, click **Hands-free** once and allow the microphone. Then speak: "Alfred, put the red cube in the box." Only sentences with "Alfred" reach her. "Alfred, stop" freezes the arm. You can also type into the box and press Enter.
 
 Use headphones: otherwise the microphone can hear her voice. Chrome sends microphone audio to Google for speech recognition.
 
@@ -71,9 +92,8 @@ Use headphones: otherwise the microphone can hear her voice. Chrome sends microp
 ```bash
 ./demo.sh                                        # fake packs, macOS voice
 ```
-It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Friday (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Friday, sort the table", or type into the box. "Friday, stop" or the STOP button freezes everything until RESUME.
+It checks what it needs, opens the dashboard (http://127.0.0.1:8770) and starts Alfred (Claude Haiku, locked to the sorter tools). In Chrome press **Hands-free** and say "Alfred, sort the table", or type into the box. "Alfred, stop" or the STOP button freezes everything until RESUME.
 On the arm laptop: `AGENT_BACKEND=real ARM_TTS=voicestudio ./demo.sh` (needs Station, the IK service and a filled `agent/config/`). Add `AGENT_DRY_RUN=1` the first time: it plans every move and moves nothing.
-After a run: `.venv/bin/python agent/report.py` prints what happened per pack (what Claude read, the bin, the outcome) and every arm step that went wrong (refused, stopped, nothing caught, or ended more than 10 mm from its target). The raw logs are `runs/agent/proof.jsonl` (decisions) and `runs/agent/motion.jsonl` (every arm step: asked vs reached position, motor steps, gripper opening, time).
 
 ## 6. Daily workflow
 ```bash
@@ -104,6 +124,8 @@ Follow `venue/VENUE.md`: Station version and address, `arm.py bringup` (joint di
 - `AGENTS.md` (repo-editing agents), `operator/AGENTS.md` (the robot-driving agent), `CONTRIBUTING.md` (how we work)
 
 ## Status
-Measured in simulation: cubes 12/12, mixed objects 11/12, recovery from a knocked-out object, a flat pencil not graspable. **Nothing has run on real hardware yet.**
+Real arm: voice picking, sorting and the feeding demo run on the arm (team runs, 22 Nov; no logged numbers here). Hand-over and the MCP packs are verified with a stubbed arm only; the hand-over pose must be taught first. Simulation: cubes 12/12, mixed objects 11/12.
+
+The previous main (free-placement planner, motion report) is kept on branch `backup/main-2026-11-22`.
 
 Private repository. Third-party parts keep their licences: `elrobot/` comes from norma-core (MIT), and `so101-sim/robotstudio_so101` carries its own licence.

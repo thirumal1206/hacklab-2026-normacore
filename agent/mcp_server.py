@@ -12,9 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from sorter import Sorter  # noqa: E402
 
 S = {"type": "string"}
-TOOLS = {
-    "plan_pick": ("Dry-run free-placement pickup with taught drop bin; never moves.", {"id": S, "bin": S}, ["id", "bin"]),
-    "vision_preview": ("Read-only generic object detections and reach rejection reasons. No movement.", {}, []),  # name: (description, {param: schema}, required)
+TOOLS = {  # name: (description, {param: schema}, required)
     "scan": ("Lists every pack on the table: id, product, code, expiry, days_left, recalled, in_reach, fragile. Call once per batch.", {}, []),
     "list_bins": ("Bins, and which product goes to which bin.", {}, []),
     "inspect": ("Close-up photo of one pack from the wrist camera. Read the printed name and pass it to sort as read_name.",
@@ -24,7 +22,7 @@ TOOLS = {
              {"id": S, "bin": S, "reason": S, "read_name": S, "read_code": S, "read_expiry": S}, ["id", "bin", "reason"]),
     "flag": ("Leave a pack for a person, with the reason (out of reach, grasp failed twice, unclear label).",
              {"id": S, "reason": S}, ["id", "reason"]),
-    "say": ("Speak one short line aloud as Friday (also shown on the dashboard). One line per instruction.", {"text": S}, ["text"]),
+    "say": ("Speak one short line aloud as Alfred (also shown on the dashboard). One line per instruction.", {"text": S}, ["text"]),
     "listen": ("Wait for the next spoken or typed instruction from the dashboard. Returns instruction, or null after wait_s.",
                {"wait_s": {"type": "number"}}, []),
     "summary": ("End-of-batch result: counts per bin, flagged, refused, left on the table, proof log path.", {}, []),
@@ -35,19 +33,7 @@ sorter = None
 def run_tool(name, a):
     global sorter
     sorter = sorter or Sorter()
-    if name == "plan_pick":
-        if not hasattr(sorter.b, "plan_pick"):
-            out = {"error": "Select AGENT_BACKEND=free_preview"}
-        elif sorter.guard():
-            out = {"error": sorter.guard()}
-        else:
-            out = sorter.b.plan_pick(a["id"], a["bin"])
-    elif name == "vision_preview":
-        if not hasattr(sorter.b, "diagnostics"):
-            out = {"error": "Select AGENT_BACKEND=free_preview for this tool"}
-        else:
-            out = sorter.b.diagnostics()
-    elif name == "sort":
+    if name == "sort":
         out = sorter.sort(a["id"], a["bin"], a["reason"], a.get("read_code"), a.get("read_expiry"), a.get("read_name"))
     elif name in ("inspect",):
         out = sorter.inspect(a["id"])
@@ -60,7 +46,7 @@ def run_tool(name, a):
     else:
         out = getattr(sorter, name)()
     content = []
-    if name == "inspect" and not out.get("error"):
+    if name == "inspect":
         content.append({"type": "image", "mimeType": "image/png", "data": base64.b64encode(Path(out.pop("image")).read_bytes()).decode()})
     content.insert(0, {"type": "text", "text": json.dumps(out)})
     return {"content": content, "isError": bool(out.get("error"))}

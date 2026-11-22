@@ -59,7 +59,7 @@ def fingerprint():
 
 
 INBOX = RUNS / "inbox.jsonl"  # what people said or typed on the dashboard, one {"time","text"} per line
-HUSH = RUNS / "hush"  # touched by the dashboard when someone starts talking: cut Friday off
+HUSH = RUNS / "hush"  # touched by the dashboard when someone starts talking: cut Alfred off
 
 
 def norm(s):
@@ -124,9 +124,6 @@ class Sorter:
         if backend is None:
             if os.environ.get("AGENT_BACKEND", "fake") == "fake":
                 backend = FakeBackend()
-            elif os.environ.get("AGENT_BACKEND") == "free_preview":
-                from free_placement import Backend
-                backend = Backend()
             else:
                 import real  # agent/real.py, provided by Vision + Motion
 
@@ -146,7 +143,7 @@ class Sorter:
         self.voice, self.heard_n = None, len(read_inbox())
         RUNS.mkdir(parents=True, exist_ok=True)
         self.log = RUNS / "proof.jsonl"
-        missing = [] if self.fake or hasattr(self.b, "diagnostics") else missing_config()
+        missing = [] if self.fake else missing_config()
         if missing:
             raise RuntimeError("config incomplete, fill in: " + ", ".join(missing))
         self.write({"time": now(), "session": "start", "backend": "fake" if self.fake else "real", "dry_run": self.dry,
@@ -189,8 +186,6 @@ class Sorter:
         }
 
     def in_reach(self, p):
-        if hasattr(self.b, "validate_target"):
-            return self.b.validate_target(p) is None
         if p.get("slot"):  # a taught slot is reachable by construction
             return True
         r = self.ws["reach"]
@@ -258,15 +253,7 @@ class Sorter:
         return res
 
     def inspect(self, pack_id):
-        if self.guard():
-            return {"error": self.guard()}
-        if pack_id not in self.packs:
-            return {"error": "Unknown or stale target; scan again"}
         p = self.packs[pack_id]
-        if hasattr(self.b, "validate_target"):
-            error = self.b.validate_target(p)
-            if error:
-                return {"error": error}
         img = p.get("crop") or self.b.crop(pack_id)
         self.write({"time": now(), "id": pack_id, "event": "inspect", "image": img})
         hint = ("Read the medicine name printed on the foil, exactly as printed. Pass it to sort as read_name. "
