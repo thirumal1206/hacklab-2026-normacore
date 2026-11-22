@@ -16,7 +16,7 @@ from arm_server import AGENT_FILE, env  # noqa: E402
 
 LLM = os.environ.get("VOICE_LLM", "claude-haiku-4-5")  # fast; ElevenLabs lists the allowed ids if this one is refused
 VOICE_ID = os.environ.get("VOICE_ID", "cgSgspJ2msm6clMCkdW9")  # Jessica, conversational
-TTS_MODEL = os.environ.get("TTS_MODEL", "eleven_flash_v2_5")  # lowest latency
+TTS_MODEL = os.environ.get("TTS_MODEL", "eleven_flash_v2")  # lowest latency; English agents must use turbo or flash v2
 
 PROMPT = """You are Friday, the voice of a robot arm that picks objects from a table and drops them into bins 1 to 5.
 You talk with the person standing at the table. This is live speech: be very brief, usually under 12 words, no lists,
