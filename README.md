@@ -1,10 +1,31 @@
-# HackLab 2026: NormaCore track
+# Alfred: a voice-driven assistant arm
 
-Claude Code or Codex controls a robot arm by looking through its cameras, using NormaCore's Station API.
+HackLab Robotics x BRISA, Berlin, 21-22 Nov 2026, NormaCore track. You talk to Alfred; a camera finds the objects, Claude decides what to do, and deterministic code moves the arm and keeps it safe.
 
-The model chooses and verifies; code measures and moves. A daemon (`arm.py serve`) holds the robot (or a MuJoCo simulation) and enforces every safety limit. The model calls a small CLI or the MCP tools: `locate` numbers the objects it sees, `pick`/`place` grasp them, and `locate`/`look` confirm the result. A voice assistant, Alfred, sits on top.
+**Modes are MCP packs.** One arm server owns motion, vision, speed limits and the stop. Each mode is a small pack (`operator/packs/<mode>/pack.json`) listing its tools, its speed and how Alfred behaves. A new mode is a new pack, not new motion code.
 
-**New here? Open [`docs/field-guide.html`](docs/field-guide.html) in a browser first:** architecture, sequence diagrams, the pick pipeline, safety layers, results and what we tried.
+| Pack | What it does | Speed |
+|---|---|---|
+| `table` | Tidy the desk: sort objects into bins, hand one to you | full |
+| `assist` | Feeding and hand-over for people with limited arm use | 30 % |
+
+![Alfred architecture](docs/architecture.svg)
+
+**Tidy mode, step by step:**
+
+![Tidy mode sequence](docs/sequence-tidy.svg)
+
+## Run Alfred on the arm
+```bash
+.venv/bin/python agent/live_vision.py              # camera -> objects (page on :8771)
+.venv/bin/python agent/arm_server.py               # dry run: plans, nothing moves; add --go for the real arm
+claude mcp add table -e PACK=table -- $PWD/.venv/bin/python $PWD/agent/arm_mcp.py
+```
+Then in Claude: *"Alfred, tidy my desk: pens left, snacks right."* The voice page on http://127.0.0.1:8772 (ElevenLabs) works beside it. Saying "stop", the STOP button and the 12 V plug always work. Details: [`operator/packs/README.md`](operator/packs/README.md).
+
+The sections below cover setup and the MuJoCo simulation we started from.
+
+**Visual overview:** open [`docs/field-guide.html`](docs/field-guide.html) in a browser.
 
 ## 1. One-time setup (macOS)
 You need [Homebrew](https://brew.sh). Then, in a terminal:
@@ -103,6 +124,8 @@ Follow `venue/VENUE.md`: Station version and address, `arm.py bringup` (joint di
 - `AGENTS.md` (repo-editing agents), `operator/AGENTS.md` (the robot-driving agent), `CONTRIBUTING.md` (how we work)
 
 ## Status
-Measured in simulation: cubes 12/12, mixed objects 11/12, recovery from a knocked-out object, a flat pencil not graspable. **Nothing has run on real hardware yet.**
+Real arm: voice picking, sorting and the feeding demo run on the arm (team runs, 22 Nov; no logged numbers here). Hand-over and the MCP packs are verified with a stubbed arm only; the hand-over pose must be taught first. Simulation: cubes 12/12, mixed objects 11/12.
+
+The previous main (free-placement planner, motion report) is kept on branch `backup/main-2026-11-22`.
 
 Private repository. Third-party parts keep their licences: `elrobot/` comes from norma-core (MIT), and `so101-sim/robotstudio_so101` carries its own licence.
