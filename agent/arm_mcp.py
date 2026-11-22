@@ -31,11 +31,14 @@ ALL = {  # name: (description, properties, required, method, path)
     "abort": ("Stop now and put a held object back.", {}, [], "POST", "/api/abort"),
     "gripper": ("Open or close the jaws.", {"action": {"type": "string", "enum": ["open", "close"]}}, ["action"],
                 "POST", "/api/gripper"),
+    "speed": ("Arm speed from 0.2 (slow) to 1.0 (full); applies from the next move. Use on 'slower' or 'faster'.",
+              {"scale": N}, ["scale"], "POST", "/api/speed"),
     "wait": ("Wait until the arm is idle (or wait_s passes) and return what it reported meanwhile.",
              {"wait_s": N}, [], None, None),
 }
 TOOLS = {n: ALL[n] for n in PACK["tools"]}
 seen = 0  # last event seq returned to the model
+speed_set = False  # the pack's default speed goes to arm_server before the first tool call
 
 
 def http(method, path, body=None):
@@ -59,7 +62,10 @@ def wait(wait_s=60):
 
 
 def run_tool(name, a):
-    global seen
+    global seen, speed_set
+    if not speed_set and "speed" in PACK and name != "speed":
+        http("POST", "/api/speed", {"scale": PACK["speed"]})
+    speed_set = True
     _, _, _, method, path = TOOLS[name]
     if name == "wait":
         return wait(a.get("wait_s", 60))

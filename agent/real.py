@@ -29,6 +29,21 @@ RUNS = HERE.parent / "runs" / "agent"
 STOP = RUNS / "STOP"
 JAW = RUNS / "jaw_goal.txt"  # last gripper goal sent; every command repeats it (see jaw_goal)
 DRY = os.environ.get("REAL_DRY") == "1"
+SCALE = 1.0  # live speed factor on motion.json speeds; set only through set_scale (clamped)
+
+
+def set_scale(x):
+    global SCALE
+    try:
+        SCALE = min(max(float(x), 0.2), 1.0)
+    except (TypeError, ValueError):
+        raise RuntimeError(f"speed must be a number from 0.2 to 1.0, got {x!r}") from None
+    return SCALE
+
+
+def speed(kind):
+    sp = cfg("motion.json")["speed"][kind]
+    return {"speed": max(int(sp["speed"] * SCALE), 1), "accel": max(int(sp["accel"] * SCALE), 1)}
 
 
 class Stopped(Exception):
@@ -93,10 +108,9 @@ def move(pose, label, loaded=False):
     if not pose:
         raise RuntimeError(f"pose '{label}' is not taught: agent/teach.py")
     m = cfg("motion.json")
-    sp = m["speed"]["loaded" if loaded else "empty"]
     body = {"position": {"x": pose["x"], "y": pose["y"], "z": pose["z"]},
             "orientation": {"rpy": {"roll": pose["roll"], "pitch": pose["pitch"], "yaw": pose["yaw"]}},
-            "speed": sp["speed"], "accel": sp["accel"]}
+            **speed("loaded" if loaded else "empty")}
     if not DRY:
         body["gripper"] = jaw_goal()  # keep the jaws torqued (see jaw_goal)
     if m["safety"].get("fast") and not DRY:  # fast: one request, only the IK API's own checks
@@ -137,7 +151,7 @@ def grip(opening, settle=True, at=None):
         {"position": {k: at[k] for k in ("x", "y", "z")},
          "orientation": {"rpy": {k: at[k] for k in ("roll", "pitch", "yaw")}},
          "gripper": opening, "execute": True,
-         "speed": m["speed"]["empty"]["speed"], "accel": m["speed"]["empty"]["accel"]}, timeout=30)
+         **speed("empty")}, timeout=30)
     if settle:
         time.sleep(m["grasp"]["settle_s"])
     return follower().get("gripper") or 0.0
@@ -225,9 +239,8 @@ def free_move(x, y, z, rpy, label, ref, max_diff, motors, loaded=False, execute=
     if STOP.exists():
         raise Stopped(f"stopped by a person before '{label}'")
     m = cfg("motion.json")
-    sp = m["speed"]["loaded" if loaded else "empty"]
     body = {"position": {"x": x, "y": y, "z": z}, "orientation": {"rpy": dict(zip(("roll", "pitch", "yaw"), rpy))},
-            "speed": sp["speed"], "accel": sp["accel"]}
+            **speed("loaded" if loaded else "empty")}
     if execute and not DRY:
         body["gripper"] = jaw_goal()  # keep the jaws torqued (see jaw_goal)
     if m["safety"].get("fast") and execute and not DRY:  # fast: one request, only the IK API's own checks

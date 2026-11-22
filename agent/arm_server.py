@@ -12,6 +12,7 @@ The agent (created by create_voice_agent.py) calls these as client tools from th
     POST /api/stop | /api/resume | /api/abort | /api/cancel | /api/home
     POST /api/bin    {bin}            later objects of the running pick go there
     POST /api/gripper {action: open|close}
+    POST /api/speed  {scale}          live speed factor 0.2-1.0 on motion.json speeds (feed never above FEED_SPEED)
     POST /api/feed                    candy from the taught spot to the person (config/feed_poses.json), slow near them
     GET  /api/events?after=N          progress events for the page (and through it the agent)
     GET  /api/session                 signed ElevenLabs URL (key stays here, from .env)
@@ -183,7 +184,8 @@ class Arm:
         real.api("POST", f"/arms/{real.cfg('motion.json')['follower_bus']}/move-to",
                  {"position": {k: pose[k] for k in ("x", "y", "z")},
                   "orientation": {"rpy": {k: pose[k] for k in ("roll", "pitch", "yaw")}},
-                  "gripper": real.jaw_goal() if gripper is None else gripper, "execute": True, **FEED_SPEED}, timeout=60)
+                  "gripper": real.jaw_goal() if gripper is None else gripper, "execute": True,
+                  **{k: min(v, real.speed("empty")[k]) for k, v in FEED_SPEED.items()}}, timeout=60)
 
     def feed(self):
         if self.busy():
@@ -289,6 +291,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/bin": lambda: ARM.set_bin(body.get("bin")),
             "/api/home": lambda: ARM.idle_move("home"),
             "/api/feed": ARM.feed,
+            "/api/speed": lambda: f"Speed set to {round(real.set_scale(body.get('scale', 1.0)) * 100)} percent.",
             "/api/gripper": lambda: ARM.idle_move("open" if body.get("action") == "open" else "close"),
         }
         fn = routes.get(self.path)
