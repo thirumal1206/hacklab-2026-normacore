@@ -2,18 +2,18 @@
   "camera_id": "835446b047547e89f1f2e588eedf268b",
   "H_pixel_to_xy": [
     [
-      -6.447164924560747e-05,
-      0.003318847672483559,
-      -1.1323591365815588
+      -3.389670095781332e-05,
+      0.0029801888270067187,
+      -1.0302051394836091
     ],
     [
-      0.0021254378790938563,
-      0.0001455651929112976,
-      -1.4844432766874818
+      0.0019302974489777724,
+      9.332793730746704e-05,
+      -1.3174552262233483
     ],
     [
-      0.00013032022429077363,
-      0.0031026272012572103,
+      0.00010040217602150886,
+      0.002625979803353353,
       1.0
     ]
   ],
@@ -22,13 +22,11 @@
     960
   ],
   "points": 9,
-  "rms_mm": 2.8,
-  "max_mm": 10.0,
-  "loo_rms_mm": 5.5,
+  "rms_mm": 2.9,
+  "max_mm": 9.9,
+  "loo_rms_mm": 5.7,
   "model": "homography",
-  "quad_residual": null,
-  "time": "2026-11-22 09:45",
-  "z_note": "jaw tips touching pencil crosses (hand-guided, torque off), pixel and FK same session 22.11; pixel -> follower FK x, y (m)",
+  "time": "2026-11-22 refit",
   "crosses_used": [
     "cross_1",
     "cross_2",
@@ -39,5 +37,6 @@
     "cross_7",
     "cross_8",
     "cross_9"
-  ]
+  ],
+  "z_note": "22.11 morning touches (hand-guided) + cross pixels re-found after the camera shifted about 8 px; pixel -> follower FK x, y (m)"
 }
