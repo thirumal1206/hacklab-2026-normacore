@@ -1,9 +1,9 @@
-"""Voice front end for pick_place.py: "Friday, put the ball on the card."
+"""Voice front end for pick_place.py: "Alfred, put the ball on the card."
 
     uv run --with httpx --with python-dotenv python voice_pick.py      # then open http://127.0.0.1:5080 in Chrome
 
 The page listens with the browser's speech recognition (same wake word, echo filter and keep-alive as arm.py's live view),
-sends the words after "Friday" here, and Friday answers out loud (ARM_TTS=voicestudio on :3900, else macOS say).
+sends the words after "Alfred" here, and Alfred answers out loud (ARM_TTS=voicestudio on :3900, else macOS say).
 Commands: "put the ball on the card" (pick + place), "pick up the ball" (pick, put back where it was),
 "where is the ball" (look only), "go to rest". Objects are found in the overview camera with
 calib/overview_homography.json: white blobs inside the calibrated area; the card is the rectangle, the ball the other one.
@@ -36,14 +36,14 @@ def say(text):
     global said
     said = text
     log_lines.append({"t": time.time(), "say": text})
-    print(f"FRIDAY: {text}", flush=True)
+    print(f"ALFRED: {text}", flush=True)
     try:
         if os.environ.get("ARM_TTS", "say") == "voicestudio":
             body = {"model": os.environ.get("ARM_TTS_MODEL", "tts-1"), "input": text,
                     "voice": os.environ.get("ARM_VOICE", "af_heart"), "response_format": "wav"}
             req = urllib.request.Request(os.environ.get("ARM_TTS_URL", "http://127.0.0.1:3900") + "/v1/audio/speech",
                                          json.dumps(body).encode(), {"Content-Type": "application/json"})
-            wav = HERE / "logs" / "friday.wav"
+            wav = HERE / "logs" / "alfred.wav"
             wav.parent.mkdir(exist_ok=True)
             wav.write_bytes(urllib.request.urlopen(req, timeout=60).read())
             subprocess.run(["afplay", str(wav)])
@@ -157,7 +157,7 @@ def worker():
             busy.clear()
 
 
-PAGE = """<!doctype html><meta charset=utf-8><title>Friday</title>
+PAGE = """<!doctype html><meta charset=utf-8><title>Alfred</title>
 <style>body{margin:0;font:15px system-ui;background:#111;color:#ddd;display:flex;height:100vh}
 #img{flex:3;display:flex;align-items:center;justify-content:center;background:#000}#img img{max-width:100%;max-height:100%}
 #side{flex:2;display:flex;flex-direction:column;min-width:0}#log{flex:1;overflow:auto;padding:12px}
@@ -165,13 +165,13 @@ PAGE = """<!doctype html><meta charset=utf-8><title>Friday</title>
 #f button{font:16px system-ui;padding:8px 12px;border-radius:6px;border:0;background:#2a5;color:#fff;cursor:pointer}#f button.on{background:#c33}#f button+button{background:#357}
 .e{padding:6px 8px;border-bottom:1px solid #222}.dim{color:#888}#hear{padding:8px 12px;color:#fc6;min-height:1.2em;border-bottom:1px solid #333}.say{color:#fff;font-size:17px;background:#234}@media(max-width:700px){body{flex-direction:column}}</style>
 <div id=img><img id=cam></div><div id=side><form id=f><button type=button id=mic>Hands-free</button>
-<input id=t placeholder='Say "Friday, put the ball on the card" or type it' autocomplete=off></form><div id=hear></div><div id=log></div></div>
+<input id=t placeholder='Say "Alfred, put the ball on the card" or type it' autocomplete=off></form><div id=hear></div><div id=log></div></div>
 <script>
 const send=t=>t&&fetch('command',{method:'POST',body:JSON.stringify({text:t})});
 const f=document.getElementById('f'),t=document.getElementById('t'),mic=document.getElementById('mic');
 f.onsubmit=e=>{e.preventDefault();send(t.value.trim());t.value=''};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const WAKE=/\\b(friday|fri day|fryday|fri-day|frida|freddy)\\b[\\s,.!?]*/i;  // common mis-hearings of the wake word
+const WAKE=/\\b(alfred|al fred|alfredo|elfred|alfie)\\b[\\s,.!?]*/i;  // common mis-hearings of the wake word
 const norm=t=>t.toLowerCase().replace(/[^a-z ]/g,'').trim();
 let said='',hands=null,n=0;
 const log=document.getElementById('log'),cam=document.getElementById('cam'),hear=document.getElementById('hear');
@@ -202,14 +202,14 @@ talk.onclick=()=>{const r=recognizer(t=>{if(echo(t))return note('(own voice, ign
 mic.onclick=()=>{
   if(hands){const h=hands;hands=null;h.stop();mic.classList.remove('on');mic.textContent='Hands-free';hear.textContent='';return}
   const r=recognizer(wakeCmd,true);hands=r;
-  mic.classList.add('on');mic.textContent='Listening: say "Friday, ..."';hear.textContent='mic starting...';
-  r.onstart=()=>{hear.textContent='mic on, say "Friday, put the ball on the card"'};
+  mic.classList.add('on');mic.textContent='Listening: say "Alfred, ..."';hear.textContent='mic starting...';
+  r.onstart=()=>{hear.textContent='mic on, say "Alfred, put the ball on the card"'};
   r.onend=()=>{if(hands!==r)return;setTimeout(()=>{try{r.start()}catch(e){hands=null;mic.classList.remove('on');
     mic.textContent='Hands-free';hear.textContent='mic stopped ('+e.message+'): click Talk or Hands-free again'}},300)};
   try{r.start()}catch(e){hear.textContent='mic could not start: '+e.message}}}
 async function tick(){try{const s=await (await fetch('state?since='+n)).json();said=norm(s.said);
   for(const e of s.lines){n++;const d=document.createElement('div');d.className=e.say?'e say':'e';
-    d.textContent=(e.say?'Friday: '+e.say:new Date(e.t*1000).toLocaleTimeString()+'  '+e.text);log.prepend(d)}}catch(_){}
+    d.textContent=(e.say?'Alfred: '+e.say:new Date(e.t*1000).toLocaleTimeString()+'  '+e.text);log.prepend(d)}}catch(_){}
   setTimeout(tick,500)}tick();
 setInterval(()=>{cam.src='img?'+Date.now()},1000);
 </script>"""
@@ -254,5 +254,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     threading.Thread(target=worker, daemon=True).start()
-    print(f"Friday: open http://127.0.0.1:{PORT} in Chrome, click Hands-free, say 'Friday, put the ball on the card'", flush=True)
+    print(f"Alfred: open http://127.0.0.1:{PORT} in Chrome, click Hands-free, say 'Alfred, put the ball on the card'", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

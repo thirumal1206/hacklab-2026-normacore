@@ -8,17 +8,17 @@ Everything below is untested on real hardware. Record what you see in `CHANGELOG
 | Sat 11:00 opening | Learn the task, judging, hardware, Station version and address | Answers to "At the opening" below written in CHANGELOG |
 | Sat until ~14:00 | Bring-up on the real arm: `bringup`, joint directions, gripper, calibration | Reprojection error < 5 px; one pick by hand command works |
 | Sat afternoon | Smoke test then 10 timed trials; fix what breaks; taught-grid fallback if IK is off | Success rate written in a `changelog.d/` fragment |
-| Sat evening | Friday end to end on the real arm, the task they announced | One full run without touching the keyboard |
+| Sat evening | Alfred end to end on the real arm, the task they announced | One full run without touching the keyboard |
 | Sun morning | Harden: lighting, crowding, recovery; record the backup video | Backup video saved; demo script rehearsed twice |
 | Sun 17:45 | Submission (repo public if they require it) | Submitted |
 | Sun 18:00 / 19:00 | Judging / pitches | |
 
-Roles: one person on the arm and bring-up (hand near the arm, owns `relax`), one on Friday, the live view and the pitch. Swap only at a checkpoint.
+Roles: one person on the arm and bring-up (hand near the arm, owns `relax`), one on Alfred, the live view and the pitch. Swap only at a checkpoint.
 
 ## Pack list
 - Both laptops charged, chargers, a **multi-socket strip**. A USB hub (USB-A/C adapters) and a spare USB-C cable.
 - **Printed ArUco sheet** (`venue/aruco_markers_A4.png`, 100%, a marker measures 50 mm) plus a spare, and tape.
-- **Headphones** for the Friday laptop: the speaker echo otherwise reaches the mic (the echo filter is a backstop, not a guarantee).
+- **Headphones** for the Alfred laptop: the speaker echo otherwise reaches the mic (the echo filter is a backstop, not a guarantee).
 - A phone hotspot (see "What needs internet").
 - A few test objects of our own: cubes, a cup, a pen, an eraser (known to work in sim).
 
@@ -28,13 +28,13 @@ Roles: one person on the arm and bring-up (hand near the arm, owns `relax`), one
 | Claude Code / Codex (the model) | Station, `arm.py` daemon, the simulator |
 | Hands-free speech recognition in Chrome (Google) | VoiceStudio voice: start it with `HF_HUB_OFFLINE=1` (verified: speech generated with Hugging Face offline) |
 | `git push`, `uv sync` on a fresh laptop | Live view, typing commands into it |
-If the venue Wi-Fi is slow: switch the Friday laptop to the phone hotspot, and type into the live view instead of talking.
+If the venue Wi-Fi is slow: switch the Alfred laptop to the phone hotspot, and type into the live view instead of talking.
 
 ## Demo script (under 1 minute, rehearse it)
-1. (Live view on the big screen, objects on the table.) "Friday, hello." She waves and greets.
-2. "Friday, tidy the table." She reports one line per object; the marks image updates.
+1. (Live view on the big screen, objects on the table.) "Alfred, hello." She waves and greets.
+2. "Alfred, tidy the table." She reports one line per object; the marks image updates.
 3. Mid-task, one of us moves an object back out. She notices on her next look and fixes it: **this is the moment to point at.**
-4. "Friday, stop." The arm freezes; she confirms in one line.
+4. "Alfred, stop." The arm freezes; she confirms in one line.
 5. Close: "The model only chooses and checks; code measures and moves, and every safety limit lives in the robot daemon."
 Backup: the recorded video of the same run.
 
@@ -69,7 +69,7 @@ Backup: the recorded video of the same run.
    - ElRobot: joint angles come from mapping the calibrated range onto the URDF limits (as NormaCore's viewer does). Not verified.
 5. **Calibrate the top camera** (fixed, looking down): lay the 4 markers flat and spread out, `arm.py calibrate top`, then for each marker `arm.py move X Y 1` onto its centre and `arm.py calib-mark ID`. Reprojection error must be under 5 px.
 6. **Smoke test:** one object, `arm.py locate`, `arm.py pick ID`, `arm.py place X Y`. Then 10 timed trials.
-7. **Operator model:** Friday (voice assistant) runs well on Haiku: `claude --model haiku` in `operator/` (about 10x cheaper per command than Sonnet, see CHANGELOG). For long autonomous tasks, Sonnet follows the finer rules more closely.
+7. **Operator model:** Alfred (voice assistant) runs well on Haiku: `claude --model haiku` in `operator/` (about 10x cheaper per command than Sonnet, see CHANGELOG). For long autonomous tasks, Sonnet follows the finer rules more closely.
 8. **Operator:** start Claude Code (or Codex) inside `operator/`; it reads `AGENTS.md`. Claude Code also offers the `arm` MCP server from `operator/.mcp.json` on first start: approve it, and images arrive inline in the tool results (the CLI still works without it). Always confirm results with `locate` or `look top`: operators over-claim from images.
 9. **Live view for the judges:** `arm.py view` in another terminal, open http://127.0.0.1:8766 (ARM_PORT+1) on a big screen. It shows the latest image and every command, with the operator's `say` lines highlighted. It updates after each command finishes, not during a move.
 
@@ -91,7 +91,7 @@ arm.py serve --backend station --station 127.0.0.1:8888 --repo <matching norma-c
 ```
 Voice (VoiceStudio, `afplay`), the live view, Claude Code and the microphone stay on the Mac and work unchanged. Camera frames cross the tunnel (480p JPEG or VP8: small).
 
-**If the daemon itself must run on the Pi:** 64-bit Raspberry Pi OS, 4 GB RAM or more (Pi 5 preferred), `uv sync`. The real-arm daemon loads kinematics only (about 490 MB, no renderer, no graphics needed). Tunnel `8765` (daemon) and `8766` (live view) to the Mac instead; `listen`, the MCP tools and images (through the live view) work across it. Limit: the robot voice uses macOS tools, so Friday is silent on a Pi (text still shows in the live view).
+**If the daemon itself must run on the Pi:** 64-bit Raspberry Pi OS, 4 GB RAM or more (Pi 5 preferred), `uv sync`. The real-arm daemon loads kinematics only (about 490 MB, no renderer, no graphics needed). Tunnel `8765` (daemon) and `8766` (live view) to the Mac instead; `listen`, the MCP tools and images (through the live view) work across it. Limit: the robot voice uses macOS tools, so Alfred is silent on a Pi (text still shows in the live view).
 
 ## If the operator is Codex
 - Codex's default sandbox blocks the CLI's connection to the daemon (verified). Start the daemon with `ARM_SOCK=$PWD/runs/arm.sock` and give the operator the same variable: the socket works under `codex sandbox --allow-unix-socket <path>` (verified), but how a running Codex session is given that permission is not verified (the config key did not work in my test). If Codex asks to run a command outside the sandbox, that approval is the fallback.
