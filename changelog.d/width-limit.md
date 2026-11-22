@@ -1,0 +1,1 @@
+- Pick width limit raised to 6.5 cm (outlines include wings and shadow), and Friday now gives the exact reason an object cannot be picked instead of saying "out of reach".
